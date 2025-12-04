@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.0.1"
+LAUNCHER_VERSION = "2.1.0"
 # ====================================================================
 
 import customtkinter as ctk
@@ -772,7 +772,7 @@ class MatrixRain(ctk.CTkCanvas):
             if self.drops[i] * 18 > height + 200:
                 self.drops[i] = random.randint(-10, 0)
         
-        self.after(80, self.animate)
+        self.after(120, self.animate)  # Optimized: slower animation for better performance
     
     def stop(self):
         self.running = False
@@ -1183,20 +1183,14 @@ class Launcher(ctk.CTk):
         self.after(500, self.blink_cursor)
     
     def _pulse_status(self):
-        """Subtle pulse on status indicator - green when online, red when offline"""
+        """Update status indicator - green when online, red when offline"""
         try:
             if self.is_logged_in:
-                # Pulse between green shades when online
-                colors = [COLORS["success"], COLORS["terminal_green"], COLORS["success"]]
-                self._status_step = getattr(self, '_status_step', 0)
-                color = colors[self._status_step % len(colors)]
-                self.status_indicator.configure(text="● ONLINE", text_color=color)
-                self._status_step += 1
+                self.status_indicator.configure(text="● ONLINE", text_color=COLORS["success"])
             else:
-                # Solid red when offline
                 self.status_indicator.configure(text="● OFFLINE", text_color=COLORS["error"])
             
-            self.after(2000, self._pulse_status)
+            self.after(5000, self._pulse_status)  # Check less frequently
         except:
             pass
 
@@ -1311,35 +1305,21 @@ class Launcher(ctk.CTk):
             self.title_label.configure(text=self._typing_text)
     
     def _pulse_launch_btn(self):
-        """Subtle pulsing glow effect on launch button"""
+        """Static glow on launch button - optimized"""
         if self.current_page != "home" or not hasattr(self, 'home_launch_btn'):
             return
         if self.is_launching:
             return
         
         try:
-            # Cycle through glow colors
-            colors = [COLORS["accent"], COLORS["terminal_green"], COLORS["accent"]]
-            self._pulse_step = getattr(self, '_pulse_step', 0)
-            color = colors[self._pulse_step % len(colors)]
-            self.home_launch_btn.configure(border_color=color, border_width=2)
-            self._pulse_step += 1
-            self.after(800, self._pulse_launch_btn)
+            self.home_launch_btn.configure(border_color=COLORS["accent"], border_width=2)
         except:
             pass
     
     def _animate_hero_glow(self, hero):
-        """Animate the hero section border with subtle glow cycle"""
-        if self.current_page != "home":
-            return
-        
+        """Static glow on hero section - optimized"""
         try:
-            glow_colors = [COLORS["accent"], COLORS["terminal_green"], COLORS["accent_dim"], COLORS["accent"]]
-            self._hero_glow_step = getattr(self, '_hero_glow_step', 0)
-            color = glow_colors[self._hero_glow_step % len(glow_colors)]
-            hero.configure(border_color=color)
-            self._hero_glow_step += 1
-            self.after(1200, lambda: self._animate_hero_glow(hero))
+            hero.configure(border_color=COLORS["accent"])
         except:
             pass
     
@@ -2057,18 +2037,17 @@ class Launcher(ctk.CTk):
         ctk.CTkLabel(info_inner, text="> ABOUT", font=get_font(14, "bold"), 
                     text_color=COLORS["accent"]).pack(anchor="w", pady=(0, 10))
         
-        about_text = """
+        about_text = f"""
 WEJZ CLIENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Version: 2.0.1
+Version: {LAUNCHER_VERSION}
 
 Features:
   • Fabric mod loader support
   • Modrinth mod integration
   • Multi-profile management
   • Online friend system
-  • Real-time downloads
-  • Auto-update system ✨
+  • Auto-update system
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
         ctk.CTkLabel(info_inner, text=about_text, font=(FONT_FALLBACK, 10), 
@@ -2570,49 +2549,99 @@ Features:
             self._display_add_friend()
     
     def _display_friends_list(self):
-        """Display friends list"""
+        """Display friends list with enhanced features"""
+        # Stats header
+        online_count = sum(1 for f in self.friends_list if f.get("is_online"))
+        total_count = len(self.friends_list)
+        
+        stats_frame = ctk.CTkFrame(self.friends_content, fg_color=COLORS["bg_medium"], 
+                                   corner_radius=8, height=50)
+        stats_frame.pack(fill="x", pady=(0, 15))
+        stats_frame.pack_propagate(False)
+        
+        stats_inner = ctk.CTkFrame(stats_frame, fg_color="transparent")
+        stats_inner.pack(fill="both", expand=True, padx=15)
+        
+        ctk.CTkLabel(stats_inner, text=f"Friends: {total_count}", font=get_font(12, "bold"),
+                    text_color=COLORS["text"]).pack(side="left", pady=12)
+        ctk.CTkLabel(stats_inner, text=f"  |  ", font=get_font(12),
+                    text_color=COLORS["text3"]).pack(side="left")
+        ctk.CTkLabel(stats_inner, text=f"● {online_count} Online", font=get_font(11),
+                    text_color=COLORS["success"]).pack(side="left")
+        ctk.CTkLabel(stats_inner, text=f"  ● {total_count - online_count} Offline", font=get_font(11),
+                    text_color=COLORS["error"]).pack(side="left")
+        
         if not self.friends_list:
-            ctk.CTkLabel(self.friends_content, text="No friends yet. Add some!", 
-                        font=get_font(12), text_color=COLORS["text3"]).pack(pady=50)
+            empty_frame = ctk.CTkFrame(self.friends_content, fg_color="transparent")
+            empty_frame.pack(fill="both", expand=True)
+            ctk.CTkLabel(empty_frame, text="No friends yet", font=get_font(16, "bold"),
+                        text_color=COLORS["text3"]).pack(pady=(50, 10))
+            ctk.CTkLabel(empty_frame, text="Go to ADD FRIEND tab to add friends!",
+                        font=get_font(11), text_color=COLORS["text3"]).pack()
             return
         
-        for idx, friend in enumerate(self.friends_list):
-            card = AnimatedCard(self.friends_content, fg_color=COLORS["bg_medium"], corner_radius=10,
-                               height=70, border_width=1, border_color=COLORS["border"],
-                               hover_border=COLORS["accent"], hover_fg=COLORS["bg_light"])
+        # Sort: online friends first
+        sorted_friends = sorted(self.friends_list, key=lambda x: (not x.get("is_online"), x["username"].lower()))
+        
+        for idx, friend in enumerate(sorted_friends):
+            card = ctk.CTkFrame(self.friends_content, fg_color=COLORS["bg_medium"], corner_radius=10,
+                               height=80, border_width=1, 
+                               border_color=COLORS["accent"] if friend["is_online"] else COLORS["border"])
             card.pack(fill="x", pady=3)
             card.pack_propagate(False)
             
             inner = ctk.CTkFrame(card, fg_color="transparent")
             inner.pack(fill="both", expand=True, padx=15, pady=10)
             
-            # Avatar
-            avatar = ctk.CTkFrame(inner, fg_color=COLORS["accent"] if friend["is_online"] else "#aa0000",
-                                 width=40, height=40, corner_radius=20)
-            avatar.pack(side="left")
-            avatar.pack_propagate(False)
-            ctk.CTkLabel(avatar, text=friend["username"][0].upper(), font=get_font(16, "bold"),
+            # Avatar with online indicator
+            avatar_frame = ctk.CTkFrame(inner, fg_color="transparent", width=50)
+            avatar_frame.pack(side="left")
+            avatar_frame.pack_propagate(False)
+            
+            avatar = ctk.CTkFrame(avatar_frame, fg_color=COLORS["accent"] if friend["is_online"] else COLORS["text3"],
+                                 width=45, height=45, corner_radius=22)
+            avatar.place(relx=0.5, rely=0.5, anchor="center")
+            ctk.CTkLabel(avatar, text=friend["username"][0].upper(), font=get_font(18, "bold"),
                         text_color=COLORS["bg_dark"]).place(relx=0.5, rely=0.5, anchor="center")
             
-            # Info
+            # Info section
             info = ctk.CTkFrame(inner, fg_color="transparent")
             info.pack(side="left", padx=15, fill="y")
             
-            ctk.CTkLabel(info, text=friend.get("display_name") or friend["username"], 
-                        font=get_font(13, "bold"), text_color=COLORS["text"]).pack(anchor="w")
+            # Username and display name
+            name_frame = ctk.CTkFrame(info, fg_color="transparent")
+            name_frame.pack(anchor="w")
+            ctk.CTkLabel(name_frame, text=friend.get("display_name") or friend["username"], 
+                        font=get_font(13, "bold"), text_color=COLORS["text"]).pack(side="left")
+            if friend.get("display_name") and friend["display_name"] != friend["username"]:
+                ctk.CTkLabel(name_frame, text=f"  @{friend['username']}", 
+                            font=get_font(10), text_color=COLORS["text3"]).pack(side="left")
             
-            status_text = "● Online" if friend["is_online"] else "● Offline"
-            status_color = COLORS["success"] if friend["is_online"] else COLORS["error"]
-            ctk.CTkLabel(info, text=status_text, font=get_font(10), 
-                        text_color=status_color).pack(anchor="w")
+            # Status with last seen
+            status_frame = ctk.CTkFrame(info, fg_color="transparent")
+            status_frame.pack(anchor="w", pady=(3, 0))
+            
+            if friend["is_online"]:
+                ctk.CTkLabel(status_frame, text="● Online now", font=get_font(10, "bold"), 
+                            text_color=COLORS["success"]).pack(side="left")
+            else:
+                ctk.CTkLabel(status_frame, text="● Offline", font=get_font(10), 
+                            text_color=COLORS["error"]).pack(side="left")
+                # Show last online time if available
+                if friend.get("last_online"):
+                    last_online = friend["last_online"]
+                    ctk.CTkLabel(status_frame, text=f"  •  Last seen: {last_online[:10]}", 
+                                font=get_font(9), text_color=COLORS["text3"]).pack(side="left")
+            
+            # Action buttons
+            btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
+            btn_frame.pack(side="right")
             
             # Remove button
-            AnimatedButton(inner, text="[×]", font=get_font(14, "bold"),
-                fg_color=COLORS["error"], hover_color="#cc0000", text_color="white",
-                width=35, height=35, corner_radius=8, glow_color=COLORS["error"],
-                command=lambda u=friend["username"]: self._remove_friend(u)).pack(side="right")
-            
-            self._animate_card_in(card, idx * 40)
+            AnimatedButton(btn_frame, text="[REMOVE]", font=get_font(10, "bold"),
+                fg_color=COLORS["bg_light"], hover_color=COLORS["error"], text_color=COLORS["text2"],
+                width=80, height=32, corner_radius=6, glow_color=COLORS["error"],
+                command=lambda u=friend["username"]: self._remove_friend(u)).pack()
     
     def _display_pending_requests(self):
         """Display pending friend requests"""

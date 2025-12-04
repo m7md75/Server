@@ -207,12 +207,11 @@ async def register(user: UserRegister):
         
         cursor.execute(
             """INSERT INTO users (username, password_hash, display_name, session_token, is_online)
-               VALUES (%s, %s, ?, %s, 1)""",
+               VALUES (%s, %s, %s, %s, 1) RETURNING id""",
             (user.username, password_hash, display_name, token)
         )
-        conn.commit()
-        
         user_id = cursor.fetchone()["id"]
+        conn.commit()
         
     return {
         "success": True,

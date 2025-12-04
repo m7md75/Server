@@ -598,6 +598,38 @@ async def get_stats():
         "server_version": "1.0.0"
     }
 
+# ============== Update System ==============
+
+# Current launcher version - UPDATE THIS when you release new versions!
+LAUNCHER_VERSION = "2.0.0"
+LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
+UPDATE_NOTES = "Initial release with online features"
+
+@app.get("/update/check")
+async def check_update():
+    """Check for launcher updates"""
+    return {
+        "latest_version": LAUNCHER_VERSION,
+        "download_url": LAUNCHER_DOWNLOAD_URL,
+        "update_notes": UPDATE_NOTES,
+        "required": False
+    }
+
+@app.post("/update/check")
+async def check_update_post(data: dict = None):
+    """Check for launcher updates (POST version)"""
+    current_version = data.get("version", "0.0.0") if data else "0.0.0"
+    needs_update = current_version != LAUNCHER_VERSION
+    
+    return {
+        "latest_version": LAUNCHER_VERSION,
+        "current_version": current_version,
+        "update_available": needs_update,
+        "download_url": LAUNCHER_DOWNLOAD_URL,
+        "update_notes": UPDATE_NOTES,
+        "required": False
+    }
+
 # ============== Startup ==============
 
 @app.on_event("startup")

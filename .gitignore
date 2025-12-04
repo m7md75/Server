@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Database (don't commit user data!)
+*.db
+*.sqlite
+*.sqlite3
+
+# Session files
+session.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Launcher settings (local)
+launcher_settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+

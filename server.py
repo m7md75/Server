@@ -1,7 +1,7 @@
 """
 WeJZ Client Online Server
 User authentication and friend system backend
-Ready for cloud deployment (Render, Railway, Fly.io)
+Ready for cloud deployment with Supabase PostgreSQL
 """
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request
@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import sqlite3
 import hashlib
 import secrets
 import time
@@ -19,10 +18,20 @@ from contextlib import contextmanager
 import uvicorn
 import os
 
+# PostgreSQL with Supabase
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
 # Get port from environment (for cloud hosting)
 PORT = int(os.environ.get("PORT", 8000))
 # Secret key for extra security (set in environment)
 SECRET_KEY = os.environ.get("SECRET_KEY", "wejz-default-key-change-in-production")
+
+# Database URL - Supabase PostgreSQL
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", 
+    "postgresql://postgres:5tCHmCdfgUViS1i9@db.hlzzwuzjkbkgojwppahz.supabase.co:5432/postgres"
+)
 
 app = FastAPI(title="WeJZ Online", version="1.0.0")
 
@@ -35,54 +44,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE = "wejz_users.db"
-
-# ============== Database Setup ==============
+# ============== Database Setup (PostgreSQL) ==============
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    """Get PostgreSQL connection"""
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     try:
         yield conn
     finally:
         conn.close()
 
 def init_db():
-    """Initialize database tables"""
+    """Initialize database tables in PostgreSQL"""
     with get_db() as conn:
         cursor = conn.cursor()
         
         # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                display_name TEXT,
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                display_name VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_online TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_online INTEGER DEFAULT 0,
-                session_token TEXT
+                session_token VARCHAR(255)
             )
         """)
         
         # Friends table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS friends (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                friend_id INTEGER NOT NULL,
-                status TEXT DEFAULT 'pending',
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                friend_id INTEGER NOT NULL REFERENCES users(id),
+                status VARCHAR(20) DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (friend_id) REFERENCES users(id),
                 UNIQUE(user_id, friend_id)
             )
         """)
         
         conn.commit()
-        print("[DB] Database initialized")
+        print("[DB] PostgreSQL database initialized")
 
 # ============== Models ==============
 
@@ -135,7 +140,7 @@ def get_user_by_token(token: str):
     """Get user from session token"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE session_token = ?", (token,))
+        cursor.execute("SELECT * FROM users WHERE session_token = %s", (token,))
         return cursor.fetchone()
 
 def update_last_online(user_id: int):
@@ -143,7 +148,7 @@ def update_last_online(user_id: int):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE users SET last_online = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE users SET last_online = CURRENT_TIMESTAMP WHERE id = %s",
             (user_id,)
         )
         conn.commit()
@@ -168,7 +173,7 @@ async def register(user: UserRegister):
         cursor = conn.cursor()
         
         # Check if username exists
-        cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (user.username,))
+        cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(%s)", (user.username,))
         if cursor.fetchone():
             raise HTTPException(status_code=400, detail="Username already taken")
         
@@ -179,12 +184,12 @@ async def register(user: UserRegister):
         
         cursor.execute(
             """INSERT INTO users (username, password_hash, display_name, session_token, is_online)
-               VALUES (?, ?, ?, ?, 1)""",
+               VALUES (%s, %s, ?, %s, 1)""",
             (user.username, password_hash, display_name, token)
         )
         conn.commit()
         
-        user_id = cursor.lastrowid
+        user_id = cursor.fetchone()["id"]
         
     return {
         "success": True,
@@ -205,7 +210,7 @@ async def login(user: UserLogin):
         password_hash = hash_password(user.password)
         
         cursor.execute(
-            "SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND password_hash = ?",
+            "SELECT * FROM users WHERE LOWER(username) = LOWER(%s) AND password_hash = %s",
             (user.username, password_hash)
         )
         row = cursor.fetchone()
@@ -216,8 +221,8 @@ async def login(user: UserLogin):
         # Generate new token and set online
         token = generate_token()
         cursor.execute(
-            """UPDATE users SET session_token = ?, is_online = 1, last_online = CURRENT_TIMESTAMP
-               WHERE id = ?""",
+            """UPDATE users SET session_token = %s, is_online = 1, last_online = CURRENT_TIMESTAMP
+               WHERE id = %s""",
             (token, row["id"])
         )
         conn.commit()
@@ -243,7 +248,7 @@ async def logout(req: TokenRequest):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE users SET session_token = NULL, is_online = 0 WHERE id = ?",
+            "UPDATE users SET session_token = NULL, is_online = 0 WHERE id = %s",
             (user["id"],)
         )
         conn.commit()
@@ -278,7 +283,7 @@ async def heartbeat(req: TokenRequest):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE users SET is_online = 1, last_online = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE users SET is_online = 1, last_online = CURRENT_TIMESTAMP WHERE id = %s",
             (user["id"],)
         )
         conn.commit()
@@ -299,7 +304,7 @@ async def send_friend_request(req: FriendRequest):
         
         # Find target user
         cursor.execute(
-            "SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)",
+            "SELECT id, username FROM users WHERE LOWER(username) = LOWER(%s)",
             (req.target_username,)
         )
         target = cursor.fetchone()
@@ -313,7 +318,7 @@ async def send_friend_request(req: FriendRequest):
         # Check if already friends or pending
         cursor.execute(
             """SELECT * FROM friends 
-               WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)""",
+               WHERE (user_id = %s AND friend_id = %s) OR (user_id = %s AND friend_id = %s)""",
             (user["id"], target["id"], target["id"], user["id"])
         )
         existing = cursor.fetchone()
@@ -328,7 +333,7 @@ async def send_friend_request(req: FriendRequest):
         
         # Create friend request
         cursor.execute(
-            "INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, 'pending')",
+            "INSERT INTO friends (user_id, friend_id, status) VALUES (%s, %s, 'pending')",
             (user["id"], target["id"])
         )
         conn.commit()
@@ -347,7 +352,7 @@ async def accept_friend_request(req: FriendRequest):
         
         # Find the sender
         cursor.execute(
-            "SELECT id FROM users WHERE LOWER(username) = LOWER(?)",
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
             (req.target_username,)
         )
         sender = cursor.fetchone()
@@ -358,7 +363,7 @@ async def accept_friend_request(req: FriendRequest):
         # Find pending request FROM them TO us
         cursor.execute(
             """UPDATE friends SET status = 'accepted'
-               WHERE user_id = ? AND friend_id = ? AND status = 'pending'""",
+               WHERE user_id = %s AND friend_id = %s AND status = 'pending'""",
             (sender["id"], user["id"])
         )
         
@@ -380,7 +385,7 @@ async def decline_friend_request(req: FriendRequest):
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id FROM users WHERE LOWER(username) = LOWER(?)",
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
             (req.target_username,)
         )
         sender = cursor.fetchone()
@@ -390,7 +395,7 @@ async def decline_friend_request(req: FriendRequest):
         
         cursor.execute(
             """DELETE FROM friends
-               WHERE user_id = ? AND friend_id = ? AND status = 'pending'""",
+               WHERE user_id = %s AND friend_id = %s AND status = 'pending'""",
             (sender["id"], user["id"])
         )
         
@@ -412,7 +417,7 @@ async def remove_friend(req: FriendRequest):
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id FROM users WHERE LOWER(username) = LOWER(?)",
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
             (req.target_username,)
         )
         friend = cursor.fetchone()
@@ -423,7 +428,7 @@ async def remove_friend(req: FriendRequest):
         # Remove friendship (either direction)
         cursor.execute(
             """DELETE FROM friends
-               WHERE ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?))
+               WHERE ((user_id = %s AND friend_id = %s) OR (user_id = %s AND friend_id = %s))
                AND status = 'accepted'""",
             (user["id"], friend["id"], friend["id"], user["id"])
         )
@@ -446,7 +451,7 @@ async def cancel_friend_request(req: FriendRequest):
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id FROM users WHERE LOWER(username) = LOWER(?)",
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
             (req.target_username,)
         )
         target = cursor.fetchone()
@@ -456,7 +461,7 @@ async def cancel_friend_request(req: FriendRequest):
         
         cursor.execute(
             """DELETE FROM friends
-               WHERE user_id = ? AND friend_id = ? AND status = 'pending'""",
+               WHERE user_id = %s AND friend_id = %s AND status = 'pending'""",
             (user["id"], target["id"])
         )
         
@@ -482,8 +487,8 @@ async def get_friends(req: TokenRequest):
             SELECT u.id, u.username, u.display_name, u.is_online, u.last_online, 'accepted' as status
             FROM users u
             JOIN friends f ON (
-                (f.user_id = ? AND f.friend_id = u.id) OR 
-                (f.friend_id = ? AND f.user_id = u.id)
+                (f.user_id = %s AND f.friend_id = u.id) OR 
+                (f.friend_id = %s AND f.user_id = u.id)
             )
             WHERE f.status = 'accepted'
             ORDER BY u.is_online DESC, u.username ASC
@@ -517,7 +522,7 @@ async def get_pending_requests(req: TokenRequest):
             SELECT u.id, u.username, u.display_name, u.is_online, f.created_at
             FROM users u
             JOIN friends f ON f.user_id = u.id
-            WHERE f.friend_id = ? AND f.status = 'pending'
+            WHERE f.friend_id = %s AND f.status = 'pending'
             ORDER BY f.created_at DESC
         """, (user["id"],))
         
@@ -536,7 +541,7 @@ async def get_pending_requests(req: TokenRequest):
             SELECT u.id, u.username, u.display_name, u.is_online, f.created_at
             FROM users u
             JOIN friends f ON f.friend_id = u.id
-            WHERE f.user_id = ? AND f.status = 'pending'
+            WHERE f.user_id = %s AND f.status = 'pending'
             ORDER BY f.created_at DESC
         """, (user["id"],))
         
@@ -567,7 +572,7 @@ async def search_users(query: str, token: str):
         cursor.execute("""
             SELECT id, username, display_name, is_online
             FROM users
-            WHERE username LIKE ? AND id != ?
+            WHERE username LIKE ? AND id != %s
             LIMIT 10
         """, (f"%{query}%", user["id"]))
         
@@ -601,9 +606,9 @@ async def get_stats():
 # ============== Update System ==============
 
 # Current launcher version - UPDATE THIS when you release new versions!
-LAUNCHER_VERSION = "2.1.2"
+LAUNCHER_VERSION = "2.2.0"
 LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
-UPDATE_NOTES = "Smart update check - ignores older versions"
+UPDATE_NOTES = "Persistent database - accounts never deleted!"
 
 @app.get("/update/check")
 async def check_update():

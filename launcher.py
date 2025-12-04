@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.1.2"
+LAUNCHER_VERSION = "2.2.0"
 # ====================================================================
 
 import customtkinter as ctk

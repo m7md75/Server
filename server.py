@@ -45,52 +45,71 @@ app.add_middleware(
 )
 
 # ============== Database Setup (PostgreSQL) ==============
+DB_CONNECTED = False
+
+# Health check endpoint (no database needed)
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "WeJZ Online", "db_connected": DB_CONNECTED}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "db": DB_CONNECTED}
 
 @contextmanager
 def get_db():
     """Get PostgreSQL connection"""
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     try:
-        yield conn
-    finally:
-        conn.close()
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            yield conn
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[DB ERROR] Connection failed: {e}")
+        raise HTTPException(status_code=500, detail="Database connection failed")
 
 def init_db():
     """Initialize database tables in PostgreSQL"""
+    global DB_CONNECTED
     try:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            
-            # Users table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(50) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    display_name VARCHAR(100),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_online TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_online INTEGER DEFAULT 0,
-                    session_token VARCHAR(255)
-                )
-            """)
-            
-            # Friends table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS friends (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id),
-                    friend_id INTEGER NOT NULL REFERENCES users(id),
-                    status VARCHAR(20) DEFAULT 'pending',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, friend_id)
-                )
-            """)
-            
-            conn.commit()
-            print("[DB] PostgreSQL connected to Supabase!")
+        print(f"[DB] Connecting to: {DATABASE_URL[:50]}...")
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
+        
+        # Users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                display_name VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_online TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_online INTEGER DEFAULT 0,
+                session_token VARCHAR(255)
+            )
+        """)
+        
+        # Friends table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS friends (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                friend_id INTEGER NOT NULL REFERENCES users(id),
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, friend_id)
+            )
+        """)
+        
+        conn.commit()
+        conn.close()
+        DB_CONNECTED = True
+        print("[DB] PostgreSQL connected to Supabase!")
     except Exception as e:
-        print(f"[DB ERROR] {e}")
+        DB_CONNECTED = False
+        print(f"[DB ERROR] Failed to connect: {e}")
 
 # ============== Models ==============
 

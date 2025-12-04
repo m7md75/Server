@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.0.0"
+LAUNCHER_VERSION = "2.0.1"
 # ====================================================================
 
 import customtkinter as ctk
@@ -2060,7 +2060,7 @@ class Launcher(ctk.CTk):
         about_text = """
 WEJZ CLIENT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Version: 2.0.0
+Version: 2.0.1
 
 Features:
   • Fabric mod loader support
@@ -2068,6 +2068,7 @@ Features:
   • Multi-profile management
   • Online friend system
   • Real-time downloads
+  • Auto-update system ✨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
         ctk.CTkLabel(info_inner, text=about_text, font=(FONT_FALLBACK, 10), 

@@ -59,15 +59,16 @@ async def health():
 @contextmanager
 def get_db():
     """Get PostgreSQL connection"""
+    conn = None
     try:
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-        try:
-            yield conn
-        finally:
+        yield conn
+    except psycopg2.Error as e:
+        print(f"[DB ERROR] {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)[:100]}")
+    finally:
+        if conn:
             conn.close()
-    except Exception as e:
-        print(f"[DB ERROR] Connection failed: {e}")
-        raise HTTPException(status_code=500, detail="Database connection failed")
 
 def init_db():
     """Initialize database tables in PostgreSQL"""

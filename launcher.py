@@ -4,8 +4,25 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.2.1"
+LAUNCHER_VERSION = "2.3.0"
 # ====================================================================
+
+# Supported Minecraft versions
+MC_VERSIONS = [
+    "1.21.4", "1.21.3", "1.21.1", "1.21",
+    "1.20.6", "1.20.4", "1.20.2", "1.20.1", "1.20",
+    "1.19.4", "1.19.3", "1.19.2", "1.19",
+    "1.18.2", "1.18.1", "1.18",
+    "1.17.1", "1.17",
+    "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1",
+    "1.15.2", "1.14.4", "1.12.2", "1.8.9", "1.7.10"
+]
+
+# Mod loaders
+MOD_LOADERS = ["vanilla", "fabric", "forge"]
+
+# Fabric API - auto-install for Fabric profiles
+FABRIC_API_PROJECT = "fabric-api"
 
 import customtkinter as ctk
 import os
@@ -629,6 +646,49 @@ class GameDownloader:
             print(f"Fabric install error: {e}")
             return None
 
+    def install_fabric_api(self, mc_version):
+        """Download and install Fabric API for the given MC version"""
+        self.progress("[FABRIC API] Downloading...", 0.91)
+        try:
+            # Get Fabric API versions from Modrinth
+            url = f"{MODRINTH_API}/project/{FABRIC_API_PROJECT}/version"
+            r = requests.get(url, timeout=15)
+            if not r.ok:
+                print(f"[FABRIC API] Failed to fetch versions: {r.status_code}")
+                return False
+            
+            versions = r.json()
+            
+            # Find version compatible with our MC version
+            for ver in versions:
+                game_versions = ver.get('game_versions', [])
+                loaders = ver.get('loaders', [])
+                
+                if mc_version in game_versions and 'fabric' in loaders:
+                    # Found compatible version
+                    files = ver.get('files', [])
+                    if files:
+                        file_info = files[0]
+                        file_url = file_info['url']
+                        file_name = file_info['filename']
+                        
+                        # Download to mods folder
+                        dest = self.mods_dir / file_name
+                        if not dest.exists():
+                            self.progress(f"[FABRIC API] {file_name[:30]}...", 0.93)
+                            if self.download_file(file_url, dest):
+                                self.progress("[OK] Fabric API installed!", 0.95)
+                                return True
+                        else:
+                            self.progress("[OK] Fabric API already installed!", 0.95)
+                            return True
+            
+            print(f"[FABRIC API] No compatible version found for MC {mc_version}")
+            return False
+        except Exception as e:
+            print(f"[FABRIC API] Error: {e}")
+            return False
+
     def build_classpath(self, version_info, fabric_profile=None):
         cp = []
         
@@ -753,8 +813,7 @@ class ProfileManager:
     def update(self, name, **kwargs):
         if name in self.profiles:
             for k, v in kwargs.items():
-                if k in self.profiles[name]:
-                    self.profiles[name][k] = v
+                self.profiles[name][k] = v  # Allow adding new keys
             self.save()
 
 
@@ -1528,25 +1587,34 @@ class Launcher(ctk.CTk):
         ctk.CTkLabel(create_inner, text="> CREATE_NEW_PROFILE", font=get_font(14, "bold"), 
                     text_color=COLORS["accent"]).pack(anchor="w", pady=(0, 15))
 
-        row = ctk.CTkFrame(create_inner, fg_color="transparent")
-        row.pack(fill="x")
+        row1 = ctk.CTkFrame(create_inner, fg_color="transparent")
+        row1.pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(row, text="NAME:", font=get_font(11), 
+        ctk.CTkLabel(row1, text="NAME:", font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
-        self.new_name = ctk.CTkEntry(row, fg_color=COLORS["bg_dark"], border_color=COLORS["border"],
-            text_color=COLORS["text"], width=180, height=40, font=get_font(12))
-        self.new_name.pack(side="left", padx=(10, 20))
+        self.new_name = ctk.CTkEntry(row1, fg_color=COLORS["bg_dark"], border_color=COLORS["border"],
+            text_color=COLORS["text"], width=150, height=38, font=get_font(12))
+        self.new_name.pack(side="left", padx=(10, 15))
 
-        ctk.CTkLabel(row, text="VERSION:", font=get_font(11), 
+        ctk.CTkLabel(row1, text="VERSION:", font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
-        self.new_ver = ctk.CTkOptionMenu(row, values=["1.21", "1.20.4", "1.20.2", "1.19.4", "1.18.2"],
+        self.new_ver = ctk.CTkOptionMenu(row1, values=MC_VERSIONS,
             fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], 
-            dropdown_fg_color=COLORS["bg_card"], width=110, height=40, font=get_font(11),
+            dropdown_fg_color=COLORS["bg_card"], width=100, height=38, font=get_font(11),
             text_color=COLORS["text"])
-        self.new_ver.pack(side="left", padx=(10, 20))
+        self.new_ver.pack(side="left", padx=(10, 15))
 
-        AnimatedButton(row, text="[ CREATE ]", font=get_font(12, "bold"), fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=120, height=40,
+        ctk.CTkLabel(row1, text="LOADER:", font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        self.new_loader = ctk.CTkOptionMenu(row1, values=["VANILLA", "FABRIC", "FORGE"],
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], 
+            dropdown_fg_color=COLORS["bg_card"], width=100, height=38, font=get_font(11),
+            text_color=COLORS["text"])
+        self.new_loader.set("FABRIC")
+        self.new_loader.pack(side="left", padx=(10, 15))
+
+        AnimatedButton(row1, text="[ CREATE ]", font=get_font(12, "bold"), fg_color=COLORS["accent"],
+            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=100, height=38,
             glow_color=COLORS["terminal_green"], command=self.create_profile).pack(side="left")
 
         # Profile list
@@ -1616,8 +1684,9 @@ class Launcher(ctk.CTk):
         if not name:
             self.notify("ERROR: Enter profile name!", True)
             return
-        if self.profiles.create(name, self.new_ver.get(), "fabric"):
-            self.notify(f"CREATED: '{name}'")
+        loader = self.new_loader.get().lower()
+        if self.profiles.create(name, self.new_ver.get(), loader):
+            self.notify(f"CREATED: '{name}' ({self.new_ver.get()} {loader})")
             self.refresh_profiles()
             self.show_profiles()
         else:
@@ -1665,11 +1734,35 @@ class Launcher(ctk.CTk):
         row1.pack(fill="x", pady=8)
         ctk.CTkLabel(row1, text="VERSION:", font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
-        self.edit_ver = ctk.CTkOptionMenu(row1, values=["1.21", "1.20.4", "1.20.2", "1.19.4", "1.18.2", "1.16.5"],
+        self.edit_ver = ctk.CTkOptionMenu(row1, values=MC_VERSIONS,
             fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], width=120, height=38,
             font=get_font(11), text_color=COLORS["text"])
-        self.edit_ver.set(prof["version"])
+        self.edit_ver.set(prof.get("version", "1.20.4"))
         self.edit_ver.pack(side="right")
+
+        # Loader (Vanilla/Fabric/Forge)
+        row_loader = ctk.CTkFrame(card_inner, fg_color="transparent")
+        row_loader.pack(fill="x", pady=8)
+        ctk.CTkLabel(row_loader, text="LOADER:", font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        self.edit_loader = ctk.CTkOptionMenu(row_loader, 
+            values=["VANILLA", "FABRIC", "FORGE"],
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], width=120, height=38,
+            font=get_font(11), text_color=COLORS["text"])
+        self.edit_loader.set(prof.get("loader", "fabric").upper())
+        self.edit_loader.pack(side="right")
+
+        # Fabric API auto-install checkbox
+        row_api = ctk.CTkFrame(card_inner, fg_color="transparent")
+        row_api.pack(fill="x", pady=8)
+        ctk.CTkLabel(row_api, text="FABRIC API:", font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        self.edit_fabric_api = ctk.CTkCheckBox(row_api, text="Auto-install (required for most mods)",
+            font=get_font(10), fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+            text_color=COLORS["text3"], checkbox_height=20, checkbox_width=20)
+        if prof.get("fabric_api", True):
+            self.edit_fabric_api.select()
+        self.edit_fabric_api.pack(side="right")
 
         # RAM
         row2 = ctk.CTkFrame(card_inner, fg_color="transparent")
@@ -1721,7 +1814,13 @@ class Launcher(ctk.CTk):
                 font=get_font(11), text_color=COLORS["text3"]).pack(pady=30)
 
     def save_profile(self, name):
-        self.profiles.update(name, version=self.edit_ver.get(), ram=int(self.edit_ram.get()))
+        loader = self.edit_loader.get().lower()
+        fabric_api = self.edit_fabric_api.get() == 1
+        self.profiles.update(name, 
+            version=self.edit_ver.get(), 
+            loader=loader,
+            fabric_api=fabric_api,
+            ram=int(self.edit_ram.get()))
         self.notify("SAVED: Profile updated!")
 
     def remove_mod(self, profile, mod_name):
@@ -3015,6 +3114,10 @@ Features:
                 fab_profile = None
                 if loader == "fabric":
                     fab_profile = dl.install_fabric(version)
+                    
+                    # Auto-install Fabric API if enabled
+                    if prof.get("fabric_api", True):
+                        dl.install_fabric_api(version)
 
                 if prof["mods"] and loader == "fabric":
                     prog("[MODS] Installing...", 0.92)

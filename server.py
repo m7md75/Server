@@ -628,9 +628,9 @@ async def get_stats():
 # ============== Update System ==============
 
 # Current launcher version - UPDATE THIS when you release new versions!
-LAUNCHER_VERSION = "2.2.1"
+LAUNCHER_VERSION = "2.3.0"
 LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
-UPDATE_NOTES = "Fixed session persistence - stay logged in!"
+UPDATE_NOTES = "Multi-version support + Vanilla/Fabric/Forge + Auto Fabric API!"
 
 @app.get("/update/check")
 async def check_update():

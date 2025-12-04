@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.1.1"
+LAUNCHER_VERSION = "2.1.2"
 # ====================================================================
 
 import customtkinter as ctk
@@ -2111,11 +2111,22 @@ Features:
             result = self.online.check_update(LAUNCHER_VERSION)
             if result["success"]:
                 data = result["data"]
-                if data.get("update_available"):
+                server_version = data.get("latest_version", "0.0.0")
+                # Only show update if server version is actually newer
+                if data.get("update_available") and self._is_newer_version(server_version, LAUNCHER_VERSION):
                     self.after(0, lambda: self._show_update_notification(data))
         
         # Check after 2 seconds delay
         self.after(2000, lambda: threading.Thread(target=do_check, daemon=True).start())
+    
+    def _is_newer_version(self, server_ver, local_ver):
+        """Compare version strings (e.g., '2.1.1' > '2.1.0')"""
+        try:
+            server_parts = [int(x) for x in server_ver.split('.')]
+            local_parts = [int(x) for x in local_ver.split('.')]
+            return server_parts > local_parts
+        except:
+            return False
     
     def _show_update_notification(self, update_data):
         """Show update available notification"""

@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.5.0"
+LAUNCHER_VERSION = "2.6.0"
 # ====================================================================
 
 # Supported Minecraft versions
@@ -40,6 +40,7 @@ from datetime import datetime
 import random
 import tkinter as tk
 from tkinter import font as tkfont
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Set appearance
 ctk.set_appearance_mode("dark")
@@ -699,18 +700,45 @@ class GameDownloader:
             with open(idx_path) as f:
                 idx = json.load(f)
             objs = idx.get('objects', {})
-            count = 0
+            
+            # Filter to only missing assets
+            to_download = []
             for name, info in objs.items():
-                if count > 100:
-                    break
                 h = info['hash']
                 p = h[:2]
                 asset_path = self.assets_dir / "objects" / p / h
                 if not asset_path.exists():
-                    self.download_file(f"https://resources.download.minecraft.net/{p}/{h}", asset_path)
-                count += 1
-        except:
-            pass
+                    to_download.append((h, p, asset_path))
+            
+            if not to_download:
+                self.progress("[ASSETS] All cached!", 0.69)
+                return
+            
+            total = len(to_download)
+            self.progress(f"[ASSETS] Downloading {total} files...", 0.65)
+            
+            # Download in parallel (20 threads = much faster)
+            completed = [0]
+            def download_one(item):
+                h, p, dest = item
+                url = f"https://resources.download.minecraft.net/{p}/{h}"
+                try:
+                    r = requests.get(url, timeout=30)
+                    if r.ok:
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes(r.content)
+                except:
+                    pass
+                completed[0] += 1
+                if completed[0] % 100 == 0:
+                    self.progress(f"[ASSETS] {completed[0]}/{total}...", 0.65 + 0.04 * (completed[0] / total))
+            
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                executor.map(download_one, to_download)
+            
+            self.progress(f"[ASSETS] Done! ({total} files)", 0.69)
+        except Exception as e:
+            print(f"Asset download error: {e}")
 
     def install_fabric(self, mc_version):
         self.progress("[FABRIC] Installing loader...", 0.72)
@@ -3006,8 +3034,6 @@ Features:
             bar.set(target_val)
         except:
             pass
-        except:
-            pass
     
     def _start_progress_glow(self, bar):
         """Pulsing glow effect on progress bar during download"""
@@ -3074,6 +3100,11 @@ Features:
                 if loader == "fabric":
                     fab_profile = dl.install_fabric(version)
                     
+                    if fab_profile is None:
+                        self.after(0, lambda: self.notify("ERROR: Fabric install failed!", True))
+                        self.after(0, self.reset_launch)
+                        return
+                    
                     # Auto-install Fabric API if enabled
                     if prof.get("fabric_api", True):
                         dl.install_fabric_api(version)
@@ -3104,12 +3135,34 @@ Features:
                 time.sleep(0.3)
 
                 cmd = dl.get_launch_cmd(ver_info, self.username, ram, java, fab_profile)
+                
+                # Debug: print the launch command
+                print(f"\n[DEBUG] Game directory: {game_dir}")
+                print(f"[DEBUG] Java: {java}")
+                print(f"[DEBUG] Fabric profile: {fab_profile is not None}")
+                print(f"[DEBUG] Command length: {len(cmd)} args")
+                print(f"[DEBUG] Main class: {cmd[cmd.index('-cp') + 2] if '-cp' in cmd else 'unknown'}")
 
                 try:
-                    if platform.system() == 'Windows':
-                        subprocess.Popen(cmd, cwd=game_dir, creationflags=0x08000000)
-                    else:
-                        subprocess.Popen(cmd, cwd=game_dir)
+                    # Create log file for game output
+                    log_file = Path(game_dir) / "launcher_debug.log"
+                    log_handle = open(log_file, 'w')
+                    log_handle.write(f"Command: {' '.join(cmd[:5])}... (truncated)\n")
+                    log_handle.write(f"Full java: {cmd[0]}\n")
+                    log_handle.write(f"Main class: {cmd[cmd.index('-cp') + 2] if '-cp' in cmd else 'unknown'}\n\n")
+                    log_handle.flush()
+                    
+                    process = subprocess.Popen(
+                        cmd, 
+                        cwd=game_dir, 
+                        stdout=log_handle,
+                        stderr=log_handle,
+                        creationflags=0x08000000 if platform.system() == 'Windows' else 0
+                    )
+                    
+                    print(f"[DEBUG] Process started with PID: {process.pid}")
+                    print(f"[DEBUG] Log file: {log_file}")
+                    print(f"[DEBUG] Check the log file if game crashes!")
 
                     loader_txt = f" + {loader.upper()}" if loader == "fabric" else ""
                     self.after(0, lambda: self.notify(f"LAUNCHED: MC {version}{loader_txt}"))
@@ -3117,6 +3170,7 @@ Features:
                 except FileNotFoundError:
                     self.after(0, lambda: self.notify("ERROR: Java not found!", True))
                 except Exception as e:
+                    print(f"[DEBUG] Launch exception: {e}")
                     self.after(0, lambda: self.notify(f"ERROR: {str(e)[:40]}", True))
 
                 self.after(0, self.reset_launch)

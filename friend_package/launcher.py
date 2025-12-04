@@ -4,8 +4,25 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.2.0"
+LAUNCHER_VERSION = "2.6.0"
 # ====================================================================
+
+# Supported Minecraft versions
+MC_VERSIONS = [
+    "1.21.4", "1.21.3", "1.21.1", "1.21",
+    "1.20.6", "1.20.4", "1.20.2", "1.20.1", "1.20",
+    "1.19.4", "1.19.3", "1.19.2", "1.19",
+    "1.18.2", "1.18.1", "1.18",
+    "1.17.1", "1.17",
+    "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1",
+    "1.15.2", "1.14.4", "1.12.2", "1.8.9", "1.7.10"
+]
+
+# Mod loaders
+MOD_LOADERS = ["vanilla", "fabric", "forge"]
+
+# Fabric API - auto-install for Fabric profiles
+FABRIC_API_PROJECT = "fabric-api"
 
 import customtkinter as ctk
 import os
@@ -23,6 +40,7 @@ from datetime import datetime
 import random
 import tkinter as tk
 from tkinter import font as tkfont
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Set appearance
 ctk.set_appearance_mode("dark")
@@ -45,6 +63,7 @@ COLORS = {
     "border": "#003300",
     "success": "#00ff00",
     "error": "#ff0000",
+    "warning": "#ff9900",
     "glow": "#00ff00",
     "terminal_green": "#33ff33",
 }
@@ -118,8 +137,14 @@ def get_font(size=14, weight="normal"):
 
 # API URLs
 MODRINTH_API = "https://api.modrinth.com/v2"
+CURSEFORGE_API = "https://api.curseforge.com/v1"
+CURSEFORGE_KEY = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"  # Public eternal API key
 VERSION_MANIFEST = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"
 FABRIC_META = "https://meta.fabricmc.net/v2"
+
+# CurseForge constants
+CF_GAME_ID = 432  # Minecraft
+CF_MOD_CLASS = 6  # Mods class
 
 # Featured mods
 MODS_DB = {
@@ -198,6 +223,108 @@ class ModrinthAPI:
         return False
 
 
+class CurseForgeAPI:
+    """CurseForge API for downloading mods"""
+    
+    @staticmethod
+    def _headers():
+        return {"x-api-key": CURSEFORGE_KEY, "Accept": "application/json"}
+    
+    @staticmethod
+    def search(query, mc_version, loader="fabric", limit=20):
+        """Search for mods on CurseForge"""
+        try:
+            # Map loader names
+            loader_type = 4 if loader == "fabric" else 1  # 1=Forge, 4=Fabric
+            
+            params = {
+                "gameId": CF_GAME_ID,
+                "classId": CF_MOD_CLASS,
+                "searchFilter": query,
+                "gameVersion": mc_version,
+                "modLoaderType": loader_type,
+                "pageSize": limit,
+                "sortField": 2,  # Popularity
+                "sortOrder": "desc"
+            }
+            r = requests.get(f"{CURSEFORGE_API}/mods/search", 
+                           params=params, headers=CurseForgeAPI._headers(), timeout=15)
+            if r.ok:
+                data = r.json().get("data", [])
+                # Convert to standard format
+                results = []
+                for mod in data:
+                    results.append({
+                        "id": mod.get("id"),
+                        "name": mod.get("name"),
+                        "slug": mod.get("slug"),
+                        "description": mod.get("summary", "")[:100],
+                        "downloads": mod.get("downloadCount", 0),
+                        "icon_url": mod.get("logo", {}).get("thumbnailUrl", ""),
+                        "source": "curseforge"
+                    })
+                return results
+            return []
+        except Exception as e:
+            print(f"[CF] Search error: {e}")
+            return []
+    
+    @staticmethod
+    def get_download_url(mod_id, mc_version, loader="fabric"):
+        """Get download URL for a mod"""
+        try:
+            # Get mod files
+            r = requests.get(f"{CURSEFORGE_API}/mods/{mod_id}/files",
+                           headers=CurseForgeAPI._headers(), timeout=15)
+            if not r.ok:
+                return None, None
+            
+            files = r.json().get("data", [])
+            loader_type = 4 if loader == "fabric" else 1
+            
+            # Find compatible file
+            for f in files:
+                game_versions = f.get("gameVersions", [])
+                if mc_version in game_versions:
+                    # Check loader compatibility
+                    if loader == "fabric" and "Fabric" in game_versions:
+                        return f.get("downloadUrl"), f.get("fileName")
+                    elif loader == "forge" and "Forge" in game_versions:
+                        return f.get("downloadUrl"), f.get("fileName")
+                    elif loader == "vanilla":
+                        return f.get("downloadUrl"), f.get("fileName")
+            
+            # Fallback: get latest file for version
+            for f in files:
+                if mc_version in f.get("gameVersions", []):
+                    return f.get("downloadUrl"), f.get("fileName")
+            
+            return None, None
+        except Exception as e:
+            print(f"[CF] Get download error: {e}")
+            return None, None
+    
+    @staticmethod
+    def get_popular(mc_version, loader="fabric", limit=20):
+        """Get popular mods"""
+        return CurseForgeAPI.search("", mc_version, loader, limit)
+    
+    @staticmethod
+    def download(url, path):
+        """Download a file"""
+        try:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            r = requests.get(url, stream=True, headers=CurseForgeAPI._headers(), timeout=120)
+            if r.ok:
+                with open(path, 'wb') as f:
+                    for chunk in r.iter_content(8192):
+                        f.write(chunk)
+                return True
+        except Exception as e:
+            print(f"[CF] Download error: {e}")
+        return False
+
+
 # Server URL - Change this to your server's address
 WEJZ_SERVER = "https://bright-giraffe-wejz-69e0bacd.koyeb.app"
 
@@ -234,31 +361,54 @@ class WeJZOnline:
         """Save session to file - preserves login across updates"""
         if self.token and self.user:
             try:
-                self._session_file.parent.mkdir(parents=True, exist_ok=True)
+                # Ensure directory exists
+                session_dir = self._session_file.parent
+                session_dir.mkdir(parents=True, exist_ok=True)
+                
                 session_data = {
                     "token": self.token, 
                     "user": self.user,
-                    "version": "2.1.1"  # Track which version saved this
+                    "version": LAUNCHER_VERSION,
+                    "saved_at": time.time()
                 }
-                with open(self._session_file, 'w', encoding='utf-8') as f:
+                
+                # Write to temp file first, then rename (atomic)
+                temp_file = self._session_file.with_suffix('.tmp')
+                with open(temp_file, 'w', encoding='utf-8') as f:
                     json.dump(session_data, f, indent=2)
-                print(f"[SESSION] Saved session for {self.user.get('username', 'unknown')}")
+                
+                # Replace original file
+                if self._session_file.exists():
+                    self._session_file.unlink()
+                temp_file.rename(self._session_file)
+                
+                print(f"[SESSION] Saved to: {self._session_file}")
             except Exception as e:
                 print(f"[SESSION] Failed to save: {e}")
+                import traceback
+                traceback.print_exc()
     
     def load_session(self):
         """Load saved session - works across updates"""
         try:
+            print(f"[SESSION] Looking for: {self._session_file}")
             if self._session_file.exists():
                 with open(self._session_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.token = data.get("token")
                     self.user = data.get("user")
+                    saved_version = data.get("version", "unknown")
                     if self.token and self.user:
-                        print(f"[SESSION] Loaded session for {self.user.get('username', 'unknown')}")
+                        print(f"[SESSION] Loaded session for {self.user.get('username', 'unknown')} (saved by v{saved_version})")
                         return True
+                    else:
+                        print("[SESSION] Session file exists but missing token/user")
+            else:
+                print("[SESSION] No session file found")
         except Exception as e:
             print(f"[SESSION] Failed to load: {e}")
+            import traceback
+            traceback.print_exc()
         return False
     
     def clear_session(self):
@@ -550,18 +700,45 @@ class GameDownloader:
             with open(idx_path) as f:
                 idx = json.load(f)
             objs = idx.get('objects', {})
-            count = 0
+            
+            # Filter to only missing assets
+            to_download = []
             for name, info in objs.items():
-                if count > 100:
-                    break
                 h = info['hash']
                 p = h[:2]
                 asset_path = self.assets_dir / "objects" / p / h
                 if not asset_path.exists():
-                    self.download_file(f"https://resources.download.minecraft.net/{p}/{h}", asset_path)
-                count += 1
-        except:
-            pass
+                    to_download.append((h, p, asset_path))
+            
+            if not to_download:
+                self.progress("[ASSETS] All cached!", 0.69)
+                return
+            
+            total = len(to_download)
+            self.progress(f"[ASSETS] Downloading {total} files...", 0.65)
+            
+            # Download in parallel (20 threads = much faster)
+            completed = [0]
+            def download_one(item):
+                h, p, dest = item
+                url = f"https://resources.download.minecraft.net/{p}/{h}"
+                try:
+                    r = requests.get(url, timeout=30)
+                    if r.ok:
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes(r.content)
+                except:
+                    pass
+                completed[0] += 1
+                if completed[0] % 100 == 0:
+                    self.progress(f"[ASSETS] {completed[0]}/{total}...", 0.65 + 0.04 * (completed[0] / total))
+            
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                executor.map(download_one, to_download)
+            
+            self.progress(f"[ASSETS] Done! ({total} files)", 0.69)
+        except Exception as e:
+            print(f"Asset download error: {e}")
 
     def install_fabric(self, mc_version):
         self.progress("[FABRIC] Installing loader...", 0.72)
@@ -605,6 +782,49 @@ class GameDownloader:
         except Exception as e:
             print(f"Fabric install error: {e}")
             return None
+
+    def install_fabric_api(self, mc_version):
+        """Download and install Fabric API for the given MC version"""
+        self.progress("[FABRIC API] Downloading...", 0.91)
+        try:
+            # Get Fabric API versions from Modrinth
+            url = f"{MODRINTH_API}/project/{FABRIC_API_PROJECT}/version"
+            r = requests.get(url, timeout=15)
+            if not r.ok:
+                print(f"[FABRIC API] Failed to fetch versions: {r.status_code}")
+                return False
+            
+            versions = r.json()
+            
+            # Find version compatible with our MC version
+            for ver in versions:
+                game_versions = ver.get('game_versions', [])
+                loaders = ver.get('loaders', [])
+                
+                if mc_version in game_versions and 'fabric' in loaders:
+                    # Found compatible version
+                    files = ver.get('files', [])
+                    if files:
+                        file_info = files[0]
+                        file_url = file_info['url']
+                        file_name = file_info['filename']
+                        
+                        # Download to mods folder
+                        dest = self.mods_dir / file_name
+                        if not dest.exists():
+                            self.progress(f"[FABRIC API] {file_name[:30]}...", 0.93)
+                            if self.download_file(file_url, dest):
+                                self.progress("[OK] Fabric API installed!", 0.95)
+                                return True
+                        else:
+                            self.progress("[OK] Fabric API already installed!", 0.95)
+                            return True
+            
+            print(f"[FABRIC API] No compatible version found for MC {mc_version}")
+            return False
+        except Exception as e:
+            print(f"[FABRIC API] Error: {e}")
+            return False
 
     def build_classpath(self, version_info, fabric_profile=None):
         cp = []
@@ -730,260 +950,55 @@ class ProfileManager:
     def update(self, name, **kwargs):
         if name in self.profiles:
             for k, v in kwargs.items():
-                if k in self.profiles[name]:
-                    self.profiles[name][k] = v
+                self.profiles[name][k] = v  # Allow adding new keys
             self.save()
 
 
-class MatrixRain(ctk.CTkCanvas):
-    """Matrix digital rain effect background"""
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, bg=COLORS["bg_dark"], highlightthickness=0, **kwargs)
-        self.chars = "01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEF0123456789<>[]{}|/"
-        self.drops = []
-        self.running = True
-        self.bind("<Configure>", self.on_resize)
-        self.after(100, self.init_drops)
-        
-    def init_drops(self):
-        width = self.winfo_width()
-        if width > 1:
-            num_cols = width // 18
-            self.drops = [random.randint(-20, 0) for _ in range(num_cols)]
-            self.animate()
-    
-    def on_resize(self, event):
-        num_cols = event.width // 18
-        if len(self.drops) != num_cols:
-            self.drops = [random.randint(-20, 0) for _ in range(num_cols)]
-    
-    def animate(self):
-        if not self.running:
-            return
-        
-        self.delete("rain")
-        height = self.winfo_height()
-        
-        for i, drop in enumerate(self.drops):
-            x = i * 18 + 9
-            char = random.choice(self.chars)
-            
-            # Draw trail
-            for j in range(8):
-                y = (drop - j) * 18
-                if 0 <= y < height:
-                    alpha = max(0, 255 - j * 35)
-                    if j == 0:
-                        color = COLORS["terminal_green"]
-                    else:
-                        green_val = max(0, 200 - j * 25)
-                        color = f"#{0:02x}{green_val:02x}{0:02x}"
-                    
-                    trail_char = random.choice(self.chars) if j > 0 else char
-                    self.create_text(x, y, text=trail_char, fill=color, 
-                                   font=(FONT_FALLBACK, 12), tags="rain")
-            
-            # Move drop
-            self.drops[i] += 1
-            if self.drops[i] * 18 > height + 200:
-                self.drops[i] = random.randint(-10, 0)
-        
-        self.after(120, self.animate)  # Optimized: slower animation for better performance
-    
-    def stop(self):
-        self.running = False
-
-
+# Simple button - no animations for performance
 class AnimatedButton(ctk.CTkButton):
-    """Button with hover glow effect and click animation"""
+    """Simple button (animations removed for performance)"""
     def __init__(self, parent, **kwargs):
-        self.glow_color = kwargs.pop('glow_color', COLORS["accent"])
-        self._original_fg = kwargs.get('fg_color', COLORS["bg_medium"])
-        self._hover_scale = 1.0
+        kwargs.pop('glow_color', None)  # Remove unused param
         super().__init__(parent, **kwargs)
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        self.bind("<Button-1>", self.on_click)
-        self.bind("<ButtonRelease-1>", self.on_release)
-        
-    def on_enter(self, e):
-        self.configure(border_color=self.glow_color, border_width=2)
-        self._animate_hover_in()
-        
-    def on_leave(self, e):
-        self.configure(border_width=0)
-        
-    def on_click(self, e):
-        # Quick pulse effect on click
-        self.configure(fg_color=self.glow_color)
-        
-    def on_release(self, e):
-        self.configure(fg_color=self._original_fg)
-        
-    def _animate_hover_in(self):
-        """Subtle brightness animation on hover"""
-        pass  # Kept simple for performance
 
 
+# Simple card - no animations for performance  
 class AnimatedCard(ctk.CTkFrame):
-    """Card with hover lift and glow animation"""
+    """Simple card frame (animations removed for performance)"""
     def __init__(self, parent, **kwargs):
-        self._hover_border = kwargs.pop('hover_border', COLORS["accent"])
-        self._normal_border = kwargs.get('border_color', COLORS["border"])
-        self._normal_fg = kwargs.get('fg_color', COLORS["bg_medium"])
-        self._hover_fg = kwargs.pop('hover_fg', COLORS["bg_light"])
+        kwargs.pop('hover_border', None)
+        kwargs.pop('hover_fg', None)
         super().__init__(parent, **kwargs)
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        self._is_hovered = False
-        
-    def on_enter(self, e):
-        if not self._is_hovered:
-            self._is_hovered = True
-            self._animate_hover(True)
-    
-    def on_leave(self, e):
-        if self._is_hovered:
-            self._is_hovered = False
-            self._animate_hover(False)
-    
-    def _animate_hover(self, entering):
-        """Smooth hover transition"""
-        if entering:
-            self.configure(
-                border_color=self._hover_border,
-                border_width=2,
-                fg_color=self._hover_fg
-            )
-        else:
-            self.configure(
-                border_color=self._normal_border,
-                border_width=1,
-                fg_color=self._normal_fg
-            )
 
 
 class TransitionManager:
-    """Handles smooth page transitions and animations"""
+    """Transitions disabled for performance"""
     
     @staticmethod
     def fade_in_widget(widget, duration=300, delay=0, start_alpha=0.0):
-        """Fade in a widget by animating from transparent"""
-        def do_fade():
-            widget.configure(fg_color=widget.cget("fg_color"))
-        if delay > 0:
-            widget.after(delay, do_fade)
-        else:
-            do_fade()
+        pass
     
     @staticmethod
     def slide_in_from_right(widget, parent, final_x, duration=300, delay=0):
-        """Slide widget in from right side"""
-        start_x = parent.winfo_width() + 50
-        steps = 15
-        step_delay = duration // steps
-        dx = (start_x - final_x) / steps
-        
-        def animate(step=0, current_x=start_x):
-            if step >= steps:
-                return
-            # Easing function (ease out)
-            progress = step / steps
-            eased = 1 - (1 - progress) ** 3
-            new_x = start_x - (start_x - final_x) * eased
-            try:
-                widget.place_configure(x=int(new_x))
-            except:
-                pass
-            widget.after(step_delay, lambda: animate(step + 1, new_x))
-        
-        widget.after(delay, animate)
+        pass
     
     @staticmethod
     def slide_in_from_bottom(widget, final_y, start_y_offset=50, duration=250, delay=0):
-        """Slide widget up from below"""
-        start_y = final_y + start_y_offset
-        steps = 12
-        step_delay = duration // steps
-        
-        def animate(step=0):
-            if step >= steps:
-                try:
-                    widget.place_configure(y=final_y)
-                except:
-                    pass
-                return
-            progress = step / steps
-            # Ease out cubic
-            eased = 1 - (1 - progress) ** 3
-            new_y = start_y - (start_y - final_y) * eased
-            try:
-                widget.place_configure(y=int(new_y))
-            except:
-                pass
-            widget.after(step_delay, lambda: animate(step + 1))
-        
-        widget.after(delay, animate)
+        pass
     
     @staticmethod
     def stagger_fade_children(parent, delay_between=50, initial_delay=0):
-        """Stagger animate children appearing one by one"""
-        children = parent.winfo_children()
-        for i, child in enumerate(children):
-            delay = initial_delay + (i * delay_between)
-            child.after(delay, lambda c=child: TransitionManager._pop_in(c))
-    
-    @staticmethod
-    def _pop_in(widget):
-        """Quick pop-in effect"""
-        try:
-            # Store original colors
-            if hasattr(widget, '_popped'):
-                return
-            widget._popped = True
-        except:
-            pass
+        pass
     
     @staticmethod
     def typing_effect(label, text, delay_per_char=30, callback=None):
-        """Terminal-style typing effect for labels"""
-        def type_char(index=0):
-            if index <= len(text):
-                label.configure(text=text[:index] + "█")
-                label.after(delay_per_char, lambda: type_char(index + 1))
-            else:
-                label.configure(text=text)
-                if callback:
-                    callback()
-        type_char()
+        label.configure(text=text)
+        if callback:
+            callback()
     
     @staticmethod
     def pulse_widget(widget, color1, color2, duration=500, cycles=2):
-        """Pulse between two colors"""
-        steps = 10
-        step_delay = duration // (steps * 2)
-        
-        def pulse(step=0, cycle=0, direction=1):
-            if cycle >= cycles:
-                widget.configure(fg_color=color1)
-                return
-            
-            if direction == 1 and step >= steps:
-                direction = -1
-            elif direction == -1 and step <= 0:
-                direction = 1
-                cycle += 1
-            
-            # Interpolate colors (simple approach - just toggle)
-            progress = step / steps
-            current = color2 if progress > 0.5 else color1
-            try:
-                widget.configure(fg_color=current)
-            except:
-                pass
-            widget.after(step_delay, lambda: pulse(step + direction, cycle, direction))
-        
-        pulse()
+        pass
 
 
 class Launcher(ctk.CTk):
@@ -1064,13 +1079,9 @@ class Launcher(ctk.CTk):
         self.container = ctk.CTkFrame(self, fg_color=COLORS["bg_dark"])
         self.container.pack(fill="both", expand=True)
         
-        # Matrix rain background
-        self.matrix_rain = MatrixRain(self.container)
-        self.matrix_rain.place(relx=0, rely=0, relwidth=1, relheight=1)
-        
-        # Overlay frame for content
-        self.overlay = ctk.CTkFrame(self.container, fg_color="transparent")
-        self.overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        # Simple dark background (no animation for performance)
+        self.overlay = ctk.CTkFrame(self.container, fg_color=COLORS["bg_dark"])
+        self.overlay.pack(fill="both", expand=True)
 
         # Sidebar with terminal style
         sidebar = ctk.CTkFrame(self.overlay, width=100, fg_color=COLORS["bg_medium"], corner_radius=0,
@@ -1193,20 +1204,16 @@ class Launcher(ctk.CTk):
         self.main.pack(fill="both", expand=True)
 
     def blink_cursor(self):
-        """Blinking cursor effect"""
-        current = self.cursor_label.cget("text")
-        self.cursor_label.configure(text="" if current else "█")
-        self.after(500, self.blink_cursor)
+        """Static cursor - no blink for performance"""
+        self.cursor_label.configure(text="█")
     
     def _pulse_status(self):
-        """Update status indicator - green when online, red when offline"""
+        """Update status indicator - no animation"""
         try:
             if self.is_logged_in:
                 self.status_indicator.configure(text="● ONLINE", text_color=COLORS["success"])
             else:
                 self.status_indicator.configure(text="● OFFLINE", text_color=COLORS["error"])
-            
-            self.after(5000, self._pulse_status)  # Check less frequently
         except:
             pass
 
@@ -1249,32 +1256,12 @@ class Launcher(ctk.CTk):
         self._animate_page_in()
     
     def _animate_page_in(self):
-        """Animate page content appearing with stagger effect"""
-        children = self.main.winfo_children()
-        for i, child in enumerate(children):
-            # Start with low opacity effect (using placement)
-            delay = i * 40
-            self.after(delay, lambda c=child: self._slide_widget_in(c))
-    
-    def _slide_widget_in(self, widget):
-        """Slide a widget in with easing"""
-        try:
-            # Quick fade-in simulation using pack/grid reconfiguration
-            widget.configure(fg_color=widget.cget("fg_color"))
-        except:
-            pass
+        """No animation for performance"""
+        pass
     
     def _animate_card_in(self, card, delay=0):
-        """Animate a card sliding in from the right with stagger delay"""
-        # Start invisible/offset
-        original_fg = card.cget("fg_color")
-        card.configure(fg_color=COLORS["bg_dark"])
-        
-        def reveal():
-            # Quick reveal animation
-            card.configure(fg_color=original_fg)
-        
-        self.after(delay + 50, reveal)
+        """No animation for performance"""
+        pass
 
     def nav(self, page):
         self.current_page = page
@@ -1298,11 +1285,8 @@ class Launcher(ctk.CTk):
         self.transition_to(page_map.get(page, self.show_home))
     
     def _animate_nav_select(self, btn):
-        """Animate nav button selection with pulse"""
-        btn.configure(fg_color=COLORS["terminal_green"], text_color=COLORS["bg_dark"])
-        self.after(80, lambda: btn.configure(fg_color=COLORS["accent"]))
-        self.after(160, lambda: btn.configure(fg_color=COLORS["terminal_green"]))
-        self.after(240, lambda: btn.configure(fg_color=COLORS["accent"]))
+        """No animation for performance"""
+        btn.configure(fg_color=COLORS["accent"], text_color=COLORS["bg_dark"])
     
     def _type_title(self, text, speed=25):
         """Terminal typing effect for title label"""
@@ -1321,49 +1305,19 @@ class Launcher(ctk.CTk):
             self.title_label.configure(text=self._typing_text)
     
     def _pulse_launch_btn(self):
-        """Static glow on launch button - optimized"""
-        if self.current_page != "home" or not hasattr(self, 'home_launch_btn'):
-            return
-        if self.is_launching:
-            return
-        
-        try:
-            self.home_launch_btn.configure(border_color=COLORS["accent"], border_width=2)
-        except:
-            pass
+        """No animation for performance"""
+        pass
     
     def _animate_hero_glow(self, hero):
-        """Static glow on hero section - optimized"""
-        try:
-            hero.configure(border_color=COLORS["accent"])
-        except:
-            pass
+        """No animation for performance"""
+        pass
     
     def _on_search_focus(self, frame, focused):
-        """Animate search bar on focus/blur"""
+        """Simple border change - no animation"""
         if focused:
             frame.configure(border_color=COLORS["accent"], border_width=2)
-            if hasattr(self, '_search_cursor'):
-                self._blink_search_cursor()
         else:
             frame.configure(border_color=COLORS["border"], border_width=1)
-    
-    def _blink_search_cursor(self):
-        """Blink the search cursor when focused"""
-        if self.current_page != "mods":
-            return
-        try:
-            if not hasattr(self, '_search_cursor'):
-                return
-            current = self._search_cursor.cget("text")
-            self._search_cursor.configure(text="█" if current == ">" else ">")
-            # Only continue if search has focus
-            if self.mod_search.focus_get() == self.mod_search:
-                self.after(400, self._blink_search_cursor)
-            else:
-                self._search_cursor.configure(text=">")
-        except:
-            pass
 
     def clear(self):
         for w in self.main.winfo_children():
@@ -1505,25 +1459,34 @@ class Launcher(ctk.CTk):
         ctk.CTkLabel(create_inner, text="> CREATE_NEW_PROFILE", font=get_font(14, "bold"), 
                     text_color=COLORS["accent"]).pack(anchor="w", pady=(0, 15))
 
-        row = ctk.CTkFrame(create_inner, fg_color="transparent")
-        row.pack(fill="x")
+        row1 = ctk.CTkFrame(create_inner, fg_color="transparent")
+        row1.pack(fill="x", pady=(0, 8))
 
-        ctk.CTkLabel(row, text="NAME:", font=get_font(11), 
+        ctk.CTkLabel(row1, text="NAME:", font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
-        self.new_name = ctk.CTkEntry(row, fg_color=COLORS["bg_dark"], border_color=COLORS["border"],
-            text_color=COLORS["text"], width=180, height=40, font=get_font(12))
-        self.new_name.pack(side="left", padx=(10, 20))
+        self.new_name = ctk.CTkEntry(row1, fg_color=COLORS["bg_dark"], border_color=COLORS["border"],
+            text_color=COLORS["text"], width=150, height=38, font=get_font(12))
+        self.new_name.pack(side="left", padx=(10, 15))
 
-        ctk.CTkLabel(row, text="VERSION:", font=get_font(11), 
+        ctk.CTkLabel(row1, text="VERSION:", font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
-        self.new_ver = ctk.CTkOptionMenu(row, values=["1.21", "1.20.4", "1.20.2", "1.19.4", "1.18.2"],
+        self.new_ver = ctk.CTkOptionMenu(row1, values=MC_VERSIONS,
             fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], 
-            dropdown_fg_color=COLORS["bg_card"], width=110, height=40, font=get_font(11),
+            dropdown_fg_color=COLORS["bg_card"], width=100, height=38, font=get_font(11),
             text_color=COLORS["text"])
-        self.new_ver.pack(side="left", padx=(10, 20))
+        self.new_ver.pack(side="left", padx=(10, 15))
 
-        AnimatedButton(row, text="[ CREATE ]", font=get_font(12, "bold"), fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=120, height=40,
+        ctk.CTkLabel(row1, text="LOADER:", font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        self.new_loader = ctk.CTkOptionMenu(row1, values=["VANILLA", "FABRIC", "FORGE"],
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], 
+            dropdown_fg_color=COLORS["bg_card"], width=100, height=38, font=get_font(11),
+            text_color=COLORS["text"])
+        self.new_loader.set("FABRIC")
+        self.new_loader.pack(side="left", padx=(10, 15))
+
+        AnimatedButton(row1, text="[ CREATE ]", font=get_font(12, "bold"), fg_color=COLORS["accent"],
+            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=100, height=38,
             glow_color=COLORS["terminal_green"], command=self.create_profile).pack(side="left")
 
         # Profile list
@@ -1593,8 +1556,9 @@ class Launcher(ctk.CTk):
         if not name:
             self.notify("ERROR: Enter profile name!", True)
             return
-        if self.profiles.create(name, self.new_ver.get(), "fabric"):
-            self.notify(f"CREATED: '{name}'")
+        loader = self.new_loader.get().lower()
+        if self.profiles.create(name, self.new_ver.get(), loader):
+            self.notify(f"CREATED: '{name}' ({self.new_ver.get()} {loader})")
             self.refresh_profiles()
             self.show_profiles()
         else:
@@ -1642,11 +1606,35 @@ class Launcher(ctk.CTk):
         row1.pack(fill="x", pady=8)
         ctk.CTkLabel(row1, text="VERSION:", font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
-        self.edit_ver = ctk.CTkOptionMenu(row1, values=["1.21", "1.20.4", "1.20.2", "1.19.4", "1.18.2", "1.16.5"],
+        self.edit_ver = ctk.CTkOptionMenu(row1, values=MC_VERSIONS,
             fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], width=120, height=38,
             font=get_font(11), text_color=COLORS["text"])
-        self.edit_ver.set(prof["version"])
+        self.edit_ver.set(prof.get("version", "1.20.4"))
         self.edit_ver.pack(side="right")
+
+        # Loader (Vanilla/Fabric/Forge)
+        row_loader = ctk.CTkFrame(card_inner, fg_color="transparent")
+        row_loader.pack(fill="x", pady=8)
+        ctk.CTkLabel(row_loader, text="LOADER:", font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        self.edit_loader = ctk.CTkOptionMenu(row_loader, 
+            values=["VANILLA", "FABRIC", "FORGE"],
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], width=120, height=38,
+            font=get_font(11), text_color=COLORS["text"])
+        self.edit_loader.set(prof.get("loader", "fabric").upper())
+        self.edit_loader.pack(side="right")
+
+        # Fabric API auto-install checkbox
+        row_api = ctk.CTkFrame(card_inner, fg_color="transparent")
+        row_api.pack(fill="x", pady=8)
+        ctk.CTkLabel(row_api, text="FABRIC API:", font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        self.edit_fabric_api = ctk.CTkCheckBox(row_api, text="Auto-install (required for most mods)",
+            font=get_font(10), fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+            text_color=COLORS["text3"], checkbox_height=20, checkbox_width=20)
+        if prof.get("fabric_api", True):
+            self.edit_fabric_api.select()
+        self.edit_fabric_api.pack(side="right")
 
         # RAM
         row2 = ctk.CTkFrame(card_inner, fg_color="transparent")
@@ -1698,7 +1686,13 @@ class Launcher(ctk.CTk):
                 font=get_font(11), text_color=COLORS["text3"]).pack(pady=30)
 
     def save_profile(self, name):
-        self.profiles.update(name, version=self.edit_ver.get(), ram=int(self.edit_ram.get()))
+        loader = self.edit_loader.get().lower()
+        fabric_api = self.edit_fabric_api.get() == 1
+        self.profiles.update(name, 
+            version=self.edit_ver.get(), 
+            loader=loader,
+            fabric_api=fabric_api,
+            ram=int(self.edit_ram.get()))
         self.notify("SAVED: Profile updated!")
 
     def remove_mod(self, profile, mod_name):
@@ -1819,7 +1813,7 @@ class Launcher(ctk.CTk):
         inner = ctk.CTkFrame(self.main, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=25, pady=25)
 
-        # Search bar with focus animation
+        # Search bar with source selector
         search_frame = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], corner_radius=10, height=55,
                                    border_width=1, border_color=COLORS["border"])
         search_frame.pack(fill="x", pady=(0, 15))
@@ -1830,17 +1824,30 @@ class Launcher(ctk.CTk):
         self._search_cursor = ctk.CTkLabel(si, text=">", font=get_font(14, "bold"), 
                     text_color=COLORS["accent"])
         self._search_cursor.pack(side="left")
-        self.mod_search = ctk.CTkEntry(si, placeholder_text="search_modrinth...", font=get_font(12),
-            fg_color="transparent", border_width=0, text_color=COLORS["text"], height=45)
+        
+        # Source selector (Modrinth/CurseForge)
+        self.mod_source = ctk.CTkOptionMenu(si, values=["MODRINTH", "CURSEFORGE"],
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], 
+            width=110, height=38, font=get_font(10, "bold"), text_color=COLORS["text"])
+        self.mod_source.set("CURSEFORGE")
+        self.mod_source.pack(side="left", padx=(10, 5))
+        
+        self.mod_search = ctk.CTkEntry(si, placeholder_text="search mods...", font=get_font(12),
+            fg_color="transparent", border_width=0, text_color=COLORS["text"], height=45, width=250)
         self.mod_search.pack(side="left", fill="x", expand=True, padx=10)
         self.mod_search.bind("<Return>", lambda e: self.search_mods())
         self.mod_search.bind("<FocusIn>", lambda e: self._on_search_focus(search_frame, True))
         self.mod_search.bind("<FocusOut>", lambda e: self._on_search_focus(search_frame, False))
         
         AnimatedButton(si, text="[SEARCH]", font=get_font(11, "bold"), fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=100, height=40,
+            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=90, height=38,
             glow_color=COLORS["terminal_green"],
-            command=self.search_mods).pack(side="right")
+            command=self.search_mods).pack(side="right", padx=(0, 5))
+        
+        AnimatedButton(si, text="[POPULAR]", font=get_font(11, "bold"), fg_color=COLORS["bg_dark"],
+            hover_color=COLORS["bg_light"], text_color=COLORS["text2"], width=90, height=38,
+            glow_color=COLORS["accent"],
+            command=self.load_popular_mods).pack(side="right", padx=(0, 5))
 
         # Category tabs
         cats = ctk.CTkFrame(inner, fg_color="transparent")
@@ -1848,7 +1855,7 @@ class Launcher(ctk.CTk):
 
         self.cat_btns = {}
         for cat, txt in [("performance", "[PERFORMANCE]"), ("visual", "[VISUAL]"),
-                         ("utility", "[UTILITY]"), ("gameplay", "[GAMEPLAY]")]:
+                         ("utility", "[UTILITY]"), ("gameplay", "[GAMEPLAY]"), ("browse", "[BROWSE ALL]")]:
             is_sel = cat == self.mod_category
             btn = AnimatedButton(cats, text=txt, font=get_font(10, "bold" if is_sel else "normal"),
                 fg_color=COLORS["accent"] if is_sel else COLORS["bg_medium"],
@@ -1861,7 +1868,9 @@ class Launcher(ctk.CTk):
             btn.pack(side="left", padx=(0, 8))
             self.cat_btns[cat] = btn
 
-        ctk.CTkLabel(cats, text=f"// Adding to: {self.current_profile}",
+        prof = self.profiles.get(self.current_profile) or {}
+        loader = prof.get("loader", "fabric").upper()
+        ctk.CTkLabel(cats, text=f"// {self.current_profile} • {prof.get('version', '1.20.4')} • {loader}",
             font=get_font(10), text_color=COLORS["text3"]).pack(side="right")
 
         # Mods list
@@ -1886,8 +1895,12 @@ class Launcher(ctk.CTk):
                            border_color=COLORS["border"],
                            font=get_font(10, "normal"))
         
-        # Slight delay before showing mods for smoother transition
-        self.after(100, self.display_mods)
+        # If "browse" selected, load popular mods
+        if cat == "browse":
+            self.after(100, self.load_popular_mods)
+        else:
+            # Slight delay before showing mods for smoother transition
+            self.after(100, self.display_mods)
 
     def display_mods(self):
         for w in self.mods_scroll.winfo_children():
@@ -1898,10 +1911,18 @@ class Launcher(ctk.CTk):
 
         mods = self.search_results if self.search_results else MODS_DB.get(self.mod_category, [])
 
+        if not mods:
+            ctk.CTkLabel(self.mods_scroll, text="No mods found. Try searching or click [POPULAR]",
+                font=get_font(12), text_color=COLORS["text3"]).pack(pady=50)
+            return
+
         for idx, mod in enumerate(mods):
             is_inst = mod["name"] in installed
+            source = mod.get("source", "featured")
+            source_color = COLORS["warning"] if source == "curseforge" else COLORS["accent"]
+            
             card = AnimatedCard(self.mods_scroll, fg_color=COLORS["bg_medium"], corner_radius=10, 
-                               height=85, border_width=1, 
+                               height=90, border_width=1, 
                                border_color=COLORS["success"] if is_inst else COLORS["border"],
                                hover_border=COLORS["terminal_green"],
                                hover_fg=COLORS["bg_light"])
@@ -1919,12 +1940,22 @@ class Launcher(ctk.CTk):
 
             header = ctk.CTkFrame(left, fg_color="transparent")
             header.pack(fill="x")
-            ctk.CTkLabel(header, text=mod.get("icon", "[?]"), font=get_font(14, "bold"), 
-                        text_color=COLORS["accent"]).pack(side="left")
-            ctk.CTkLabel(header, text=mod["name"], font=get_font(13, "bold"), 
+            
+            # Source icon
+            icon_text = mod.get("icon", "[?]")
+            ctk.CTkLabel(header, text=icon_text, font=get_font(12, "bold"), 
+                        text_color=source_color).pack(side="left")
+            ctk.CTkLabel(header, text=mod["name"][:35], font=get_font(13, "bold"), 
                         text_color=COLORS["text"]).pack(side="left", padx=10)
+            
+            # Downloads count
+            downloads = mod.get("downloads", 0)
+            if downloads > 0:
+                dl_text = f"{downloads:,}" if downloads < 1000000 else f"{downloads/1000000:.1f}M"
+                ctk.CTkLabel(header, text=f"↓{dl_text}", font=get_font(9), 
+                            text_color=COLORS["text3"]).pack(side="left", padx=5)
 
-            ctk.CTkLabel(left, text=mod.get("desc", "")[:70], font=get_font(10), 
+            ctk.CTkLabel(left, text=mod.get("desc", "")[:80], font=get_font(10), 
                         text_color=COLORS["text3"]).pack(anchor="w", pady=(5, 0))
 
             right = ctk.CTkFrame(inner, fg_color="transparent")
@@ -1950,43 +1981,131 @@ class Launcher(ctk.CTk):
             self.display_mods()
             return
 
-        prof = self.profiles.get(self.current_profile)
-        ver = prof["version"] if prof else "1.20.4"
+        prof = self.profiles.get(self.current_profile) or {}
+        ver = prof.get("version", "1.20.4")
+        loader = prof.get("loader", "fabric")
+        source = self.mod_source.get()
 
         def do_search():
-            results = ModrinthAPI.search(query, ver)
-            formatted = [{"name": r.get("title", "?"), "slug": r.get("slug", ""),
-                         "icon": "[?]", "desc": r.get("description", "")[:80]} for r in results[:15]]
-            self.search_results = formatted
+            if source == "CURSEFORGE":
+                results = CurseForgeAPI.search(query, ver, loader, 25)
+                formatted = []
+                for r in results:
+                    formatted.append({
+                        "name": r.get("name", "?"),
+                        "slug": r.get("slug", ""),
+                        "id": r.get("id"),
+                        "icon": "[CF]",
+                        "desc": r.get("description", "")[:80],
+                        "downloads": r.get("downloads", 0),
+                        "source": "curseforge"
+                    })
+                self.search_results = formatted
+            else:
+                results = ModrinthAPI.search(query, ver, 25)
+                formatted = []
+                for r in results:
+                    formatted.append({
+                        "name": r.get("title", "?"),
+                        "slug": r.get("slug", ""),
+                        "icon": "[MR]",
+                        "desc": r.get("description", "")[:80],
+                        "downloads": r.get("downloads", 0),
+                        "source": "modrinth"
+                    })
+                self.search_results = formatted
             self.after(0, self.display_mods)
 
-        self.notify("SEARCHING...")
+        self.notify(f"SEARCHING {source}...")
         threading.Thread(target=do_search, daemon=True).start()
+
+    def load_popular_mods(self):
+        """Load popular mods from selected source"""
+        prof = self.profiles.get(self.current_profile) or {}
+        ver = prof.get("version", "1.20.4")
+        loader = prof.get("loader", "fabric")
+        source = self.mod_source.get()
+
+        def do_load():
+            if source == "CURSEFORGE":
+                results = CurseForgeAPI.get_popular(ver, loader, 30)
+                self.search_results = results
+            else:
+                # Modrinth popular
+                try:
+                    params = {
+                        "facets": json.dumps([["project_type:mod"], [f"versions:{ver}"], [f"categories:{loader}"]]),
+                        "limit": 30,
+                        "index": "downloads"
+                    }
+                    r = requests.get(f"{MODRINTH_API}/search", params=params, timeout=15)
+                    if r.ok:
+                        hits = r.json().get("hits", [])
+                        self.search_results = [{
+                            "name": h.get("title", "?"),
+                            "slug": h.get("slug", ""),
+                            "icon": "[MR]",
+                            "desc": h.get("description", "")[:80],
+                            "downloads": h.get("downloads", 0),
+                            "source": "modrinth"
+                        } for h in hits]
+                except:
+                    self.search_results = []
+            self.after(0, self.display_mods)
+
+        self.notify(f"LOADING POPULAR FROM {source}...")
+        threading.Thread(target=do_load, daemon=True).start()
 
     def add_mod(self, mod):
         def do_add():
             self.after(0, lambda: self.notify(f"DOWNLOADING: {mod['name']}"))
             
-            prof = self.profiles.get(self.current_profile)
-            ver = prof["version"] if prof else "1.20.4"
+            prof = self.profiles.get(self.current_profile) or {}
+            ver = prof.get("version", "1.20.4")
+            loader = prof.get("loader", "fabric")
+            source = mod.get("source", "featured")
             slug = mod.get("slug", "")
+            mod_id = mod.get("id")
 
             filename = None
-            if slug:
-                versions = ModrinthAPI.get_versions(slug, ver)
-                if versions:
-                    files = versions[0].get("files", [])
-                    if files:
-                        url = files[0].get("url")
-                        filename = files[0].get("filename")
-                        if url and filename:
-                            dest = Path(self.settings["game_dir"]) / "mods" / filename
-                            ModrinthAPI.download(url, dest)
+            url = None
+            
+            try:
+                if source == "curseforge" and mod_id:
+                    # Download from CurseForge
+                    url, filename = CurseForgeAPI.get_download_url(mod_id, ver, loader)
+                    if url and filename:
+                        dest = Path(self.settings["game_dir"]) / "mods" / filename
+                        if not dest.exists():
+                            CurseForgeAPI.download(url, dest)
+                elif slug:
+                    # Download from Modrinth
+                    versions = ModrinthAPI.get_versions(slug, ver)
+                    if versions:
+                        files = versions[0].get("files", [])
+                        if files:
+                            url = files[0].get("url")
+                            filename = files[0].get("filename")
+                            if url and filename:
+                                dest = Path(self.settings["game_dir"]) / "mods" / filename
+                                if not dest.exists():
+                                    ModrinthAPI.download(url, dest)
 
-            mod_data = {"name": mod["name"], "slug": slug, "icon": mod.get("icon", "[?]"),
-                       "desc": mod.get("desc", ""), "filename": filename}
-            self.profiles.add_mod(self.current_profile, mod_data)
-            self.after(0, lambda: self.notify(f"INSTALLED: {mod['name']}"))
+                mod_data = {
+                    "name": mod["name"], 
+                    "slug": slug, 
+                    "id": mod_id,
+                    "icon": mod.get("icon", "[?]"),
+                    "desc": mod.get("desc", ""), 
+                    "filename": filename,
+                    "source": source
+                }
+                self.profiles.add_mod(self.current_profile, mod_data)
+                self.after(0, lambda: self.notify(f"INSTALLED: {mod['name']}"))
+            except Exception as e:
+                print(f"[MOD] Error downloading {mod['name']}: {e}")
+                self.after(0, lambda: self.notify(f"ERROR: Failed to download {mod['name']}", True))
+            
             self.after(0, self.display_mods)
 
         threading.Thread(target=do_add, daemon=True).start()
@@ -2910,21 +3029,9 @@ Features:
                 self._animate_progress(self.home_prog_bar, val)
     
     def _animate_progress(self, bar, target_val):
-        """Smooth progress bar animation"""
+        """Set progress instantly - no animation"""
         try:
-            current = bar.get()
-            if abs(current - target_val) < 0.01:
-                bar.set(target_val)
-                return
-            
-            # Ease toward target
-            diff = target_val - current
-            step = diff * 0.3  # Smooth interpolation
-            new_val = current + step
-            bar.set(new_val)
-            
-            # Continue animation
-            self.after(30, lambda: self._animate_progress(bar, target_val))
+            bar.set(target_val)
         except:
             pass
     
@@ -2992,6 +3099,15 @@ Features:
                 fab_profile = None
                 if loader == "fabric":
                     fab_profile = dl.install_fabric(version)
+                    
+                    if fab_profile is None:
+                        self.after(0, lambda: self.notify("ERROR: Fabric install failed!", True))
+                        self.after(0, self.reset_launch)
+                        return
+                    
+                    # Auto-install Fabric API if enabled
+                    if prof.get("fabric_api", True):
+                        dl.install_fabric_api(version)
 
                 if prof["mods"] and loader == "fabric":
                     prog("[MODS] Installing...", 0.92)
@@ -3019,12 +3135,34 @@ Features:
                 time.sleep(0.3)
 
                 cmd = dl.get_launch_cmd(ver_info, self.username, ram, java, fab_profile)
+                
+                # Debug: print the launch command
+                print(f"\n[DEBUG] Game directory: {game_dir}")
+                print(f"[DEBUG] Java: {java}")
+                print(f"[DEBUG] Fabric profile: {fab_profile is not None}")
+                print(f"[DEBUG] Command length: {len(cmd)} args")
+                print(f"[DEBUG] Main class: {cmd[cmd.index('-cp') + 2] if '-cp' in cmd else 'unknown'}")
 
                 try:
-                    if platform.system() == 'Windows':
-                        subprocess.Popen(cmd, cwd=game_dir, creationflags=0x08000000)
-                    else:
-                        subprocess.Popen(cmd, cwd=game_dir)
+                    # Create log file for game output
+                    log_file = Path(game_dir) / "launcher_debug.log"
+                    log_handle = open(log_file, 'w')
+                    log_handle.write(f"Command: {' '.join(cmd[:5])}... (truncated)\n")
+                    log_handle.write(f"Full java: {cmd[0]}\n")
+                    log_handle.write(f"Main class: {cmd[cmd.index('-cp') + 2] if '-cp' in cmd else 'unknown'}\n\n")
+                    log_handle.flush()
+                    
+                    process = subprocess.Popen(
+                        cmd, 
+                        cwd=game_dir, 
+                        stdout=log_handle,
+                        stderr=log_handle,
+                        creationflags=0x08000000 if platform.system() == 'Windows' else 0
+                    )
+                    
+                    print(f"[DEBUG] Process started with PID: {process.pid}")
+                    print(f"[DEBUG] Log file: {log_file}")
+                    print(f"[DEBUG] Check the log file if game crashes!")
 
                     loader_txt = f" + {loader.upper()}" if loader == "fabric" else ""
                     self.after(0, lambda: self.notify(f"LAUNCHED: MC {version}{loader_txt}"))
@@ -3032,6 +3170,7 @@ Features:
                 except FileNotFoundError:
                     self.after(0, lambda: self.notify("ERROR: Java not found!", True))
                 except Exception as e:
+                    print(f"[DEBUG] Launch exception: {e}")
                     self.after(0, lambda: self.notify(f"ERROR: {str(e)[:40]}", True))
 
                 self.after(0, self.reset_launch)

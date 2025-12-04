@@ -62,6 +62,7 @@ COLORS = {
     "border": "#003300",
     "success": "#00ff00",
     "error": "#ff0000",
+    "warning": "#ff9900",
     "glow": "#00ff00",
     "terminal_green": "#33ff33",
 }
@@ -952,108 +953,24 @@ class TransitionManager:
     @staticmethod
     def slide_in_from_right(widget, parent, final_x, duration=300, delay=0):
         pass
-        
-    @staticmethod
-    def placeholder(step=0, current_x=0):
-            if step >= steps:
-                return
-            # Easing function (ease out)
-            progress = step / steps
-            eased = 1 - (1 - progress) ** 3
-            new_x = start_x - (start_x - final_x) * eased
-            try:
-                widget.place_configure(x=int(new_x))
-            except:
-                pass
-            widget.after(step_delay, lambda: animate(step + 1, new_x))
-        
-        widget.after(delay, animate)
     
     @staticmethod
     def slide_in_from_bottom(widget, final_y, start_y_offset=50, duration=250, delay=0):
-        """Slide widget up from below"""
-        start_y = final_y + start_y_offset
-        steps = 12
-        step_delay = duration // steps
-        
-        def animate(step=0):
-            if step >= steps:
-                try:
-                    widget.place_configure(y=final_y)
-                except:
-                    pass
-                return
-            progress = step / steps
-            # Ease out cubic
-            eased = 1 - (1 - progress) ** 3
-            new_y = start_y - (start_y - final_y) * eased
-            try:
-                widget.place_configure(y=int(new_y))
-            except:
-                pass
-            widget.after(step_delay, lambda: animate(step + 1))
-        
-        widget.after(delay, animate)
+        pass
     
     @staticmethod
     def stagger_fade_children(parent, delay_between=50, initial_delay=0):
-        """Stagger animate children appearing one by one"""
-        children = parent.winfo_children()
-        for i, child in enumerate(children):
-            delay = initial_delay + (i * delay_between)
-            child.after(delay, lambda c=child: TransitionManager._pop_in(c))
-    
-    @staticmethod
-    def _pop_in(widget):
-        """Quick pop-in effect"""
-        try:
-            # Store original colors
-            if hasattr(widget, '_popped'):
-                return
-            widget._popped = True
-        except:
-            pass
+        pass
     
     @staticmethod
     def typing_effect(label, text, delay_per_char=30, callback=None):
-        """Terminal-style typing effect for labels"""
-        def type_char(index=0):
-            if index <= len(text):
-                label.configure(text=text[:index] + "█")
-                label.after(delay_per_char, lambda: type_char(index + 1))
-            else:
-                label.configure(text=text)
-                if callback:
-                    callback()
-        type_char()
+        label.configure(text=text)
+        if callback:
+            callback()
     
     @staticmethod
     def pulse_widget(widget, color1, color2, duration=500, cycles=2):
-        """Pulse between two colors"""
-        steps = 10
-        step_delay = duration // (steps * 2)
-        
-        def pulse(step=0, cycle=0, direction=1):
-            if cycle >= cycles:
-                widget.configure(fg_color=color1)
-                return
-            
-            if direction == 1 and step >= steps:
-                direction = -1
-            elif direction == -1 and step <= 0:
-                direction = 1
-                cycle += 1
-            
-            # Interpolate colors (simple approach - just toggle)
-            progress = step / steps
-            current = color2 if progress > 0.5 else color1
-            try:
-                widget.configure(fg_color=current)
-            except:
-                pass
-            widget.after(step_delay, lambda: pulse(step + direction, cycle, direction))
-        
-        pulse()
+        pass
 
 
 class Launcher(ctk.CTk):
@@ -1344,8 +1261,20 @@ class Launcher(ctk.CTk):
         btn.configure(fg_color=COLORS["accent"], text_color=COLORS["bg_dark"])
     
     def _type_title(self, text, speed=25):
-        """Set title instantly (no animation for performance)"""
-        self.title_label.configure(text=text)
+        """Terminal typing effect for title label"""
+        self._typing_text = text
+        self._typing_index = 0
+        self._type_next_char(speed)
+    
+    def _type_next_char(self, speed):
+        """Type next character in title"""
+        if self._typing_index <= len(self._typing_text):
+            displayed = self._typing_text[:self._typing_index]
+            self.title_label.configure(text=displayed + "█")
+            self._typing_index += 1
+            self.after(speed, lambda: self._type_next_char(speed))
+        else:
+            self.title_label.configure(text=self._typing_text)
     
     def _pulse_launch_btn(self):
         """No animation for performance"""

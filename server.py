@@ -601,9 +601,9 @@ async def get_stats():
 # ============== Update System ==============
 
 # Current launcher version - UPDATE THIS when you release new versions!
-LAUNCHER_VERSION = "2.1.0"
+LAUNCHER_VERSION = "2.1.1"
 LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
-UPDATE_NOTES = "Optimized performance + Enhanced friends section"
+UPDATE_NOTES = "Fixed login persistence after updates"
 
 @app.get("/update/check")
 async def check_update():

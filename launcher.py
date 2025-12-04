@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.1.0"
+LAUNCHER_VERSION = "2.1.1"
 # ====================================================================
 
 import customtkinter as ctk
@@ -231,23 +231,34 @@ class WeJZOnline:
             return {"success": False, "error": str(e)}
     
     def save_session(self):
-        """Save session to file"""
+        """Save session to file - preserves login across updates"""
         if self.token and self.user:
-            self._session_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._session_file, 'w') as f:
-                json.dump({"token": self.token, "user": self.user}, f)
+            try:
+                self._session_file.parent.mkdir(parents=True, exist_ok=True)
+                session_data = {
+                    "token": self.token, 
+                    "user": self.user,
+                    "version": "2.1.1"  # Track which version saved this
+                }
+                with open(self._session_file, 'w', encoding='utf-8') as f:
+                    json.dump(session_data, f, indent=2)
+                print(f"[SESSION] Saved session for {self.user.get('username', 'unknown')}")
+            except Exception as e:
+                print(f"[SESSION] Failed to save: {e}")
     
     def load_session(self):
-        """Load saved session"""
+        """Load saved session - works across updates"""
         try:
             if self._session_file.exists():
-                with open(self._session_file) as f:
+                with open(self._session_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.token = data.get("token")
                     self.user = data.get("user")
-                    return True
-        except:
-            pass
+                    if self.token and self.user:
+                        print(f"[SESSION] Loaded session for {self.user.get('username', 'unknown')}")
+                        return True
+        except Exception as e:
+            print(f"[SESSION] Failed to load: {e}")
         return False
     
     def clear_session(self):
@@ -257,8 +268,9 @@ class WeJZOnline:
         try:
             if self._session_file.exists():
                 self._session_file.unlink()
-        except:
-            pass
+                print("[SESSION] Cleared session")
+        except Exception as e:
+            print(f"[SESSION] Failed to clear: {e}")
     
     def register(self, username, password, display_name=None):
         """Register new account"""
@@ -298,16 +310,20 @@ class WeJZOnline:
         self.clear_session()
     
     def validate_session(self):
-        """Check if current session is valid"""
+        """Check if current session is valid - doesn't clear on failure"""
         if not self.token:
             return False
         
         result = self._request("POST", "/validate", {"token": self.token})
         if result["success"]:
             self.user = result["data"]["user"]
+            # Re-save session to ensure it's up to date
+            self.save_session()
             return True
         else:
-            self.clear_session()
+            # Don't clear session - might be network issue
+            # User can manually logout if needed
+            print(f"[SESSION] Validation failed: {result.get('error', 'unknown')}")
             return False
     
     def heartbeat(self):
@@ -2062,16 +2078,32 @@ Features:
     # ============== Online Features ==============
     
     def _try_restore_session(self):
-        """Try to restore saved session on startup"""
+        """Try to restore saved session on startup - works across updates"""
         def do_restore():
-            if self.online.load_session():
-                if self.online.validate_session():
-                    self.is_logged_in = True
-                    self.after(0, self._update_account_ui)
-                    self.after(0, lambda: self.notify(f"Welcome back, {self.online.user['username']}!"))
-                    self._refresh_friends_data()
+            try:
+                print("[STARTUP] Attempting to restore session...")
+                if self.online.load_session():
+                    print("[STARTUP] Session file found, validating...")
+                    # Try to validate with server
+                    if self.online.validate_session():
+                        self.is_logged_in = True
+                        username = self.online.user.get('username', 'User')
+                        print(f"[STARTUP] Session valid for {username}")
+                        self.after(0, self._update_account_ui)
+                        self.after(0, lambda: self.notify(f"Welcome back, {username}!"))
+                        self._refresh_friends_data()
+                    else:
+                        # Session invalid but we have saved data - keep user info for display
+                        print("[STARTUP] Session expired, need to re-login")
+                        # Don't clear - let user see they need to re-login
+                        self.after(0, self._update_account_ui)
+                else:
+                    print("[STARTUP] No saved session found")
+            except Exception as e:
+                print(f"[STARTUP] Session restore error: {e}")
         
-        threading.Thread(target=do_restore, daemon=True).start()
+        # Delay slightly to ensure UI is ready
+        self.after(500, lambda: threading.Thread(target=do_restore, daemon=True).start())
     
     def _check_for_updates(self):
         """Check for launcher updates on startup"""

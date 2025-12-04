@@ -743,14 +743,20 @@ class GameDownloader:
     def install_fabric(self, mc_version):
         self.progress("[FABRIC] Installing loader...", 0.72)
         try:
+            print(f"[FABRIC DEBUG] Fetching loader list...")
             r = requests.get(f"{FABRIC_META}/versions/loader", timeout=10)
             loaders = r.json()
             loader_ver = loaders[0]['version']
+            print(f"[FABRIC DEBUG] Latest loader: {loader_ver}")
 
-            r = requests.get(f"{FABRIC_META}/versions/loader/{mc_version}/{loader_ver}/profile/json", timeout=10)
+            url = f"{FABRIC_META}/versions/loader/{mc_version}/{loader_ver}/profile/json"
+            print(f"[FABRIC DEBUG] Fetching profile from: {url}")
+            r = requests.get(url, timeout=10)
             if not r.ok:
+                print(f"[FABRIC DEBUG] Profile request failed: {r.status_code}")
                 return None
             profile = r.json()
+            print(f"[FABRIC DEBUG] Got profile: {profile.get('id')}")
 
             ver_id = profile['id']
             ver_dir = self.versions_dir / ver_id
@@ -759,6 +765,7 @@ class GameDownloader:
                 json.dump(profile, f)
 
             libs = profile.get('libraries', [])
+            print(f"[FABRIC DEBUG] Downloading {len(libs)} libraries...")
             for i, lib in enumerate(libs):
                 prog = 0.72 + 0.18 * (i / len(libs))
                 name = lib.get('name', '').split(':')[-1][:20]
@@ -778,9 +785,12 @@ class GameDownloader:
                             self.download_file(url, dest)
 
             self.progress("[OK] Fabric installed!", 0.9)
+            print(f"[FABRIC DEBUG] Success! Returning profile")
             return profile
         except Exception as e:
-            print(f"Fabric install error: {e}")
+            print(f"[FABRIC ERROR] {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def install_fabric_api(self, mc_version):

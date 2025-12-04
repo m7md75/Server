@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.3.0"
+LAUNCHER_VERSION = "2.4.0"
 # ====================================================================
 
 # Supported Minecraft versions
@@ -135,8 +135,14 @@ def get_font(size=14, weight="normal"):
 
 # API URLs
 MODRINTH_API = "https://api.modrinth.com/v2"
+CURSEFORGE_API = "https://api.curseforge.com/v1"
+CURSEFORGE_KEY = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"  # Public eternal API key
 VERSION_MANIFEST = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json"
 FABRIC_META = "https://meta.fabricmc.net/v2"
+
+# CurseForge constants
+CF_GAME_ID = 432  # Minecraft
+CF_MOD_CLASS = 6  # Mods class
 
 # Featured mods
 MODS_DB = {
@@ -212,6 +218,108 @@ class ModrinthAPI:
                 return True
         except:
             pass
+        return False
+
+
+class CurseForgeAPI:
+    """CurseForge API for downloading mods"""
+    
+    @staticmethod
+    def _headers():
+        return {"x-api-key": CURSEFORGE_KEY, "Accept": "application/json"}
+    
+    @staticmethod
+    def search(query, mc_version, loader="fabric", limit=20):
+        """Search for mods on CurseForge"""
+        try:
+            # Map loader names
+            loader_type = 4 if loader == "fabric" else 1  # 1=Forge, 4=Fabric
+            
+            params = {
+                "gameId": CF_GAME_ID,
+                "classId": CF_MOD_CLASS,
+                "searchFilter": query,
+                "gameVersion": mc_version,
+                "modLoaderType": loader_type,
+                "pageSize": limit,
+                "sortField": 2,  # Popularity
+                "sortOrder": "desc"
+            }
+            r = requests.get(f"{CURSEFORGE_API}/mods/search", 
+                           params=params, headers=CurseForgeAPI._headers(), timeout=15)
+            if r.ok:
+                data = r.json().get("data", [])
+                # Convert to standard format
+                results = []
+                for mod in data:
+                    results.append({
+                        "id": mod.get("id"),
+                        "name": mod.get("name"),
+                        "slug": mod.get("slug"),
+                        "description": mod.get("summary", "")[:100],
+                        "downloads": mod.get("downloadCount", 0),
+                        "icon_url": mod.get("logo", {}).get("thumbnailUrl", ""),
+                        "source": "curseforge"
+                    })
+                return results
+            return []
+        except Exception as e:
+            print(f"[CF] Search error: {e}")
+            return []
+    
+    @staticmethod
+    def get_download_url(mod_id, mc_version, loader="fabric"):
+        """Get download URL for a mod"""
+        try:
+            # Get mod files
+            r = requests.get(f"{CURSEFORGE_API}/mods/{mod_id}/files",
+                           headers=CurseForgeAPI._headers(), timeout=15)
+            if not r.ok:
+                return None, None
+            
+            files = r.json().get("data", [])
+            loader_type = 4 if loader == "fabric" else 1
+            
+            # Find compatible file
+            for f in files:
+                game_versions = f.get("gameVersions", [])
+                if mc_version in game_versions:
+                    # Check loader compatibility
+                    if loader == "fabric" and "Fabric" in game_versions:
+                        return f.get("downloadUrl"), f.get("fileName")
+                    elif loader == "forge" and "Forge" in game_versions:
+                        return f.get("downloadUrl"), f.get("fileName")
+                    elif loader == "vanilla":
+                        return f.get("downloadUrl"), f.get("fileName")
+            
+            # Fallback: get latest file for version
+            for f in files:
+                if mc_version in f.get("gameVersions", []):
+                    return f.get("downloadUrl"), f.get("fileName")
+            
+            return None, None
+        except Exception as e:
+            print(f"[CF] Get download error: {e}")
+            return None, None
+    
+    @staticmethod
+    def get_popular(mc_version, loader="fabric", limit=20):
+        """Get popular mods"""
+        return CurseForgeAPI.search("", mc_version, loader, limit)
+    
+    @staticmethod
+    def download(url, path):
+        """Download a file"""
+        try:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            r = requests.get(url, stream=True, headers=CurseForgeAPI._headers(), timeout=120)
+            if r.ok:
+                with open(path, 'wb') as f:
+                    for chunk in r.iter_content(8192):
+                        f.write(chunk)
+                return True
+        except Exception as e:
+            print(f"[CF] Download error: {e}")
         return False
 
 
@@ -1941,7 +2049,7 @@ class Launcher(ctk.CTk):
         inner = ctk.CTkFrame(self.main, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=25, pady=25)
 
-        # Search bar with focus animation
+        # Search bar with source selector
         search_frame = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], corner_radius=10, height=55,
                                    border_width=1, border_color=COLORS["border"])
         search_frame.pack(fill="x", pady=(0, 15))
@@ -1952,17 +2060,30 @@ class Launcher(ctk.CTk):
         self._search_cursor = ctk.CTkLabel(si, text=">", font=get_font(14, "bold"), 
                     text_color=COLORS["accent"])
         self._search_cursor.pack(side="left")
-        self.mod_search = ctk.CTkEntry(si, placeholder_text="search_modrinth...", font=get_font(12),
-            fg_color="transparent", border_width=0, text_color=COLORS["text"], height=45)
+        
+        # Source selector (Modrinth/CurseForge)
+        self.mod_source = ctk.CTkOptionMenu(si, values=["MODRINTH", "CURSEFORGE"],
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"], 
+            width=110, height=38, font=get_font(10, "bold"), text_color=COLORS["text"])
+        self.mod_source.set("CURSEFORGE")
+        self.mod_source.pack(side="left", padx=(10, 5))
+        
+        self.mod_search = ctk.CTkEntry(si, placeholder_text="search mods...", font=get_font(12),
+            fg_color="transparent", border_width=0, text_color=COLORS["text"], height=45, width=250)
         self.mod_search.pack(side="left", fill="x", expand=True, padx=10)
         self.mod_search.bind("<Return>", lambda e: self.search_mods())
         self.mod_search.bind("<FocusIn>", lambda e: self._on_search_focus(search_frame, True))
         self.mod_search.bind("<FocusOut>", lambda e: self._on_search_focus(search_frame, False))
         
         AnimatedButton(si, text="[SEARCH]", font=get_font(11, "bold"), fg_color=COLORS["accent"],
-            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=100, height=40,
+            hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"], width=90, height=38,
             glow_color=COLORS["terminal_green"],
-            command=self.search_mods).pack(side="right")
+            command=self.search_mods).pack(side="right", padx=(0, 5))
+        
+        AnimatedButton(si, text="[POPULAR]", font=get_font(11, "bold"), fg_color=COLORS["bg_dark"],
+            hover_color=COLORS["bg_light"], text_color=COLORS["text2"], width=90, height=38,
+            glow_color=COLORS["accent"],
+            command=self.load_popular_mods).pack(side="right", padx=(0, 5))
 
         # Category tabs
         cats = ctk.CTkFrame(inner, fg_color="transparent")
@@ -1970,7 +2091,7 @@ class Launcher(ctk.CTk):
 
         self.cat_btns = {}
         for cat, txt in [("performance", "[PERFORMANCE]"), ("visual", "[VISUAL]"),
-                         ("utility", "[UTILITY]"), ("gameplay", "[GAMEPLAY]")]:
+                         ("utility", "[UTILITY]"), ("gameplay", "[GAMEPLAY]"), ("browse", "[BROWSE ALL]")]:
             is_sel = cat == self.mod_category
             btn = AnimatedButton(cats, text=txt, font=get_font(10, "bold" if is_sel else "normal"),
                 fg_color=COLORS["accent"] if is_sel else COLORS["bg_medium"],
@@ -1983,7 +2104,9 @@ class Launcher(ctk.CTk):
             btn.pack(side="left", padx=(0, 8))
             self.cat_btns[cat] = btn
 
-        ctk.CTkLabel(cats, text=f"// Adding to: {self.current_profile}",
+        prof = self.profiles.get(self.current_profile) or {}
+        loader = prof.get("loader", "fabric").upper()
+        ctk.CTkLabel(cats, text=f"// {self.current_profile} • {prof.get('version', '1.20.4')} • {loader}",
             font=get_font(10), text_color=COLORS["text3"]).pack(side="right")
 
         # Mods list
@@ -2008,8 +2131,12 @@ class Launcher(ctk.CTk):
                            border_color=COLORS["border"],
                            font=get_font(10, "normal"))
         
-        # Slight delay before showing mods for smoother transition
-        self.after(100, self.display_mods)
+        # If "browse" selected, load popular mods
+        if cat == "browse":
+            self.after(100, self.load_popular_mods)
+        else:
+            # Slight delay before showing mods for smoother transition
+            self.after(100, self.display_mods)
 
     def display_mods(self):
         for w in self.mods_scroll.winfo_children():
@@ -2020,10 +2147,18 @@ class Launcher(ctk.CTk):
 
         mods = self.search_results if self.search_results else MODS_DB.get(self.mod_category, [])
 
+        if not mods:
+            ctk.CTkLabel(self.mods_scroll, text="No mods found. Try searching or click [POPULAR]",
+                font=get_font(12), text_color=COLORS["text3"]).pack(pady=50)
+            return
+
         for idx, mod in enumerate(mods):
             is_inst = mod["name"] in installed
+            source = mod.get("source", "featured")
+            source_color = COLORS["warning"] if source == "curseforge" else COLORS["accent"]
+            
             card = AnimatedCard(self.mods_scroll, fg_color=COLORS["bg_medium"], corner_radius=10, 
-                               height=85, border_width=1, 
+                               height=90, border_width=1, 
                                border_color=COLORS["success"] if is_inst else COLORS["border"],
                                hover_border=COLORS["terminal_green"],
                                hover_fg=COLORS["bg_light"])
@@ -2041,12 +2176,22 @@ class Launcher(ctk.CTk):
 
             header = ctk.CTkFrame(left, fg_color="transparent")
             header.pack(fill="x")
-            ctk.CTkLabel(header, text=mod.get("icon", "[?]"), font=get_font(14, "bold"), 
-                        text_color=COLORS["accent"]).pack(side="left")
-            ctk.CTkLabel(header, text=mod["name"], font=get_font(13, "bold"), 
+            
+            # Source icon
+            icon_text = mod.get("icon", "[?]")
+            ctk.CTkLabel(header, text=icon_text, font=get_font(12, "bold"), 
+                        text_color=source_color).pack(side="left")
+            ctk.CTkLabel(header, text=mod["name"][:35], font=get_font(13, "bold"), 
                         text_color=COLORS["text"]).pack(side="left", padx=10)
+            
+            # Downloads count
+            downloads = mod.get("downloads", 0)
+            if downloads > 0:
+                dl_text = f"{downloads:,}" if downloads < 1000000 else f"{downloads/1000000:.1f}M"
+                ctk.CTkLabel(header, text=f"↓{dl_text}", font=get_font(9), 
+                            text_color=COLORS["text3"]).pack(side="left", padx=5)
 
-            ctk.CTkLabel(left, text=mod.get("desc", "")[:70], font=get_font(10), 
+            ctk.CTkLabel(left, text=mod.get("desc", "")[:80], font=get_font(10), 
                         text_color=COLORS["text3"]).pack(anchor="w", pady=(5, 0))
 
             right = ctk.CTkFrame(inner, fg_color="transparent")
@@ -2072,43 +2217,131 @@ class Launcher(ctk.CTk):
             self.display_mods()
             return
 
-        prof = self.profiles.get(self.current_profile)
-        ver = prof["version"] if prof else "1.20.4"
+        prof = self.profiles.get(self.current_profile) or {}
+        ver = prof.get("version", "1.20.4")
+        loader = prof.get("loader", "fabric")
+        source = self.mod_source.get()
 
         def do_search():
-            results = ModrinthAPI.search(query, ver)
-            formatted = [{"name": r.get("title", "?"), "slug": r.get("slug", ""),
-                         "icon": "[?]", "desc": r.get("description", "")[:80]} for r in results[:15]]
-            self.search_results = formatted
+            if source == "CURSEFORGE":
+                results = CurseForgeAPI.search(query, ver, loader, 25)
+                formatted = []
+                for r in results:
+                    formatted.append({
+                        "name": r.get("name", "?"),
+                        "slug": r.get("slug", ""),
+                        "id": r.get("id"),
+                        "icon": "[CF]",
+                        "desc": r.get("description", "")[:80],
+                        "downloads": r.get("downloads", 0),
+                        "source": "curseforge"
+                    })
+                self.search_results = formatted
+            else:
+                results = ModrinthAPI.search(query, ver, 25)
+                formatted = []
+                for r in results:
+                    formatted.append({
+                        "name": r.get("title", "?"),
+                        "slug": r.get("slug", ""),
+                        "icon": "[MR]",
+                        "desc": r.get("description", "")[:80],
+                        "downloads": r.get("downloads", 0),
+                        "source": "modrinth"
+                    })
+                self.search_results = formatted
             self.after(0, self.display_mods)
 
-        self.notify("SEARCHING...")
+        self.notify(f"SEARCHING {source}...")
         threading.Thread(target=do_search, daemon=True).start()
+
+    def load_popular_mods(self):
+        """Load popular mods from selected source"""
+        prof = self.profiles.get(self.current_profile) or {}
+        ver = prof.get("version", "1.20.4")
+        loader = prof.get("loader", "fabric")
+        source = self.mod_source.get()
+
+        def do_load():
+            if source == "CURSEFORGE":
+                results = CurseForgeAPI.get_popular(ver, loader, 30)
+                self.search_results = results
+            else:
+                # Modrinth popular
+                try:
+                    params = {
+                        "facets": json.dumps([["project_type:mod"], [f"versions:{ver}"], [f"categories:{loader}"]]),
+                        "limit": 30,
+                        "index": "downloads"
+                    }
+                    r = requests.get(f"{MODRINTH_API}/search", params=params, timeout=15)
+                    if r.ok:
+                        hits = r.json().get("hits", [])
+                        self.search_results = [{
+                            "name": h.get("title", "?"),
+                            "slug": h.get("slug", ""),
+                            "icon": "[MR]",
+                            "desc": h.get("description", "")[:80],
+                            "downloads": h.get("downloads", 0),
+                            "source": "modrinth"
+                        } for h in hits]
+                except:
+                    self.search_results = []
+            self.after(0, self.display_mods)
+
+        self.notify(f"LOADING POPULAR FROM {source}...")
+        threading.Thread(target=do_load, daemon=True).start()
 
     def add_mod(self, mod):
         def do_add():
             self.after(0, lambda: self.notify(f"DOWNLOADING: {mod['name']}"))
             
-            prof = self.profiles.get(self.current_profile)
-            ver = prof["version"] if prof else "1.20.4"
+            prof = self.profiles.get(self.current_profile) or {}
+            ver = prof.get("version", "1.20.4")
+            loader = prof.get("loader", "fabric")
+            source = mod.get("source", "featured")
             slug = mod.get("slug", "")
+            mod_id = mod.get("id")
 
             filename = None
-            if slug:
-                versions = ModrinthAPI.get_versions(slug, ver)
-                if versions:
-                    files = versions[0].get("files", [])
-                    if files:
-                        url = files[0].get("url")
-                        filename = files[0].get("filename")
-                        if url and filename:
-                            dest = Path(self.settings["game_dir"]) / "mods" / filename
-                            ModrinthAPI.download(url, dest)
+            url = None
+            
+            try:
+                if source == "curseforge" and mod_id:
+                    # Download from CurseForge
+                    url, filename = CurseForgeAPI.get_download_url(mod_id, ver, loader)
+                    if url and filename:
+                        dest = Path(self.settings["game_dir"]) / "mods" / filename
+                        if not dest.exists():
+                            CurseForgeAPI.download(url, dest)
+                elif slug:
+                    # Download from Modrinth
+                    versions = ModrinthAPI.get_versions(slug, ver)
+                    if versions:
+                        files = versions[0].get("files", [])
+                        if files:
+                            url = files[0].get("url")
+                            filename = files[0].get("filename")
+                            if url and filename:
+                                dest = Path(self.settings["game_dir"]) / "mods" / filename
+                                if not dest.exists():
+                                    ModrinthAPI.download(url, dest)
 
-            mod_data = {"name": mod["name"], "slug": slug, "icon": mod.get("icon", "[?]"),
-                       "desc": mod.get("desc", ""), "filename": filename}
-            self.profiles.add_mod(self.current_profile, mod_data)
-            self.after(0, lambda: self.notify(f"INSTALLED: {mod['name']}"))
+                mod_data = {
+                    "name": mod["name"], 
+                    "slug": slug, 
+                    "id": mod_id,
+                    "icon": mod.get("icon", "[?]"),
+                    "desc": mod.get("desc", ""), 
+                    "filename": filename,
+                    "source": source
+                }
+                self.profiles.add_mod(self.current_profile, mod_data)
+                self.after(0, lambda: self.notify(f"INSTALLED: {mod['name']}"))
+            except Exception as e:
+                print(f"[MOD] Error downloading {mod['name']}: {e}")
+                self.after(0, lambda: self.notify(f"ERROR: Failed to download {mod['name']}", True))
+            
             self.after(0, self.display_mods)
 
         threading.Thread(target=do_add, daemon=True).start()

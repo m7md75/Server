@@ -27,10 +27,10 @@ PORT = int(os.environ.get("PORT", 8000))
 # Secret key for extra security (set in environment)
 SECRET_KEY = os.environ.get("SECRET_KEY", "wejz-default-key-change-in-production")
 
-# Database URL - Supabase PostgreSQL
+# Database URL - Supabase PostgreSQL (with SSL)
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", 
-    "postgresql://postgres:5tCHmCdfgUViS1i9@db.hlzzwuzjkbkgojwppahz.supabase.co:5432/postgres"
+    "postgresql://postgres:5tCHmCdfgUViS1i9@db.hlzzwuzjkbkgojwppahz.supabase.co:5432/postgres?sslmode=require"
 )
 
 app = FastAPI(title="WeJZ Online", version="1.0.0")
@@ -57,37 +57,40 @@ def get_db():
 
 def init_db():
     """Initialize database tables in PostgreSQL"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        # Users table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                display_name VARCHAR(100),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_online TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_online INTEGER DEFAULT 0,
-                session_token VARCHAR(255)
-            )
-        """)
-        
-        # Friends table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS friends (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id),
-                friend_id INTEGER NOT NULL REFERENCES users(id),
-                status VARCHAR(20) DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user_id, friend_id)
-            )
-        """)
-        
-        conn.commit()
-        print("[DB] PostgreSQL database initialized")
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            
+            # Users table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    display_name VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_online TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_online INTEGER DEFAULT 0,
+                    session_token VARCHAR(255)
+                )
+            """)
+            
+            # Friends table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS friends (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    friend_id INTEGER NOT NULL REFERENCES users(id),
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, friend_id)
+                )
+            """)
+            
+            conn.commit()
+            print("[DB] PostgreSQL connected to Supabase!")
+    except Exception as e:
+        print(f"[DB ERROR] {e}")
 
 # ============== Models ==============
 

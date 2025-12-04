@@ -27,10 +27,10 @@ PORT = int(os.environ.get("PORT", 8000))
 # Secret key for extra security (set in environment)
 SECRET_KEY = os.environ.get("SECRET_KEY", "wejz-default-key-change-in-production")
 
-# Database URL - Supabase PostgreSQL (with SSL)
+# Database URL - Supabase PostgreSQL (with SSL + pooler port)
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", 
-    "postgresql://postgres:5tCHmCdfgUViS1i9@db.hlzzwuzjkbkgojwppahz.supabase.co:5432/postgres?sslmode=require"
+    "postgresql://postgres.hlzzwuzjkbkgojwppahz:5tCHmCdfgUViS1i9@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
 )
 
 app = FastAPI(title="WeJZ Online", version="1.0.0")

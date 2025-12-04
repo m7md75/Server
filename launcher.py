@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.2.0"
+LAUNCHER_VERSION = "2.2.1"
 # ====================================================================
 
 import customtkinter as ctk
@@ -234,31 +234,54 @@ class WeJZOnline:
         """Save session to file - preserves login across updates"""
         if self.token and self.user:
             try:
-                self._session_file.parent.mkdir(parents=True, exist_ok=True)
+                # Ensure directory exists
+                session_dir = self._session_file.parent
+                session_dir.mkdir(parents=True, exist_ok=True)
+                
                 session_data = {
                     "token": self.token, 
                     "user": self.user,
-                    "version": "2.1.1"  # Track which version saved this
+                    "version": LAUNCHER_VERSION,
+                    "saved_at": time.time()
                 }
-                with open(self._session_file, 'w', encoding='utf-8') as f:
+                
+                # Write to temp file first, then rename (atomic)
+                temp_file = self._session_file.with_suffix('.tmp')
+                with open(temp_file, 'w', encoding='utf-8') as f:
                     json.dump(session_data, f, indent=2)
-                print(f"[SESSION] Saved session for {self.user.get('username', 'unknown')}")
+                
+                # Replace original file
+                if self._session_file.exists():
+                    self._session_file.unlink()
+                temp_file.rename(self._session_file)
+                
+                print(f"[SESSION] Saved to: {self._session_file}")
             except Exception as e:
                 print(f"[SESSION] Failed to save: {e}")
+                import traceback
+                traceback.print_exc()
     
     def load_session(self):
         """Load saved session - works across updates"""
         try:
+            print(f"[SESSION] Looking for: {self._session_file}")
             if self._session_file.exists():
                 with open(self._session_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.token = data.get("token")
                     self.user = data.get("user")
+                    saved_version = data.get("version", "unknown")
                     if self.token and self.user:
-                        print(f"[SESSION] Loaded session for {self.user.get('username', 'unknown')}")
+                        print(f"[SESSION] Loaded session for {self.user.get('username', 'unknown')} (saved by v{saved_version})")
                         return True
+                    else:
+                        print("[SESSION] Session file exists but missing token/user")
+            else:
+                print("[SESSION] No session file found")
         except Exception as e:
             print(f"[SESSION] Failed to load: {e}")
+            import traceback
+            traceback.print_exc()
         return False
     
     def clear_session(self):

@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.4.0"
+LAUNCHER_VERSION = "2.5.0"
 # ====================================================================
 
 # Supported Minecraft versions
@@ -925,156 +925,36 @@ class ProfileManager:
             self.save()
 
 
-class MatrixRain(ctk.CTkCanvas):
-    """Matrix digital rain effect background"""
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, bg=COLORS["bg_dark"], highlightthickness=0, **kwargs)
-        self.chars = "01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEF0123456789<>[]{}|/"
-        self.drops = []
-        self.running = True
-        self.bind("<Configure>", self.on_resize)
-        self.after(100, self.init_drops)
-        
-    def init_drops(self):
-        width = self.winfo_width()
-        if width > 1:
-            num_cols = width // 18
-            self.drops = [random.randint(-20, 0) for _ in range(num_cols)]
-            self.animate()
-    
-    def on_resize(self, event):
-        num_cols = event.width // 18
-        if len(self.drops) != num_cols:
-            self.drops = [random.randint(-20, 0) for _ in range(num_cols)]
-    
-    def animate(self):
-        if not self.running:
-            return
-        
-        self.delete("rain")
-        height = self.winfo_height()
-        
-        for i, drop in enumerate(self.drops):
-            x = i * 18 + 9
-            char = random.choice(self.chars)
-            
-            # Draw trail
-            for j in range(8):
-                y = (drop - j) * 18
-                if 0 <= y < height:
-                    alpha = max(0, 255 - j * 35)
-                    if j == 0:
-                        color = COLORS["terminal_green"]
-                    else:
-                        green_val = max(0, 200 - j * 25)
-                        color = f"#{0:02x}{green_val:02x}{0:02x}"
-                    
-                    trail_char = random.choice(self.chars) if j > 0 else char
-                    self.create_text(x, y, text=trail_char, fill=color, 
-                                   font=(FONT_FALLBACK, 12), tags="rain")
-            
-            # Move drop
-            self.drops[i] += 1
-            if self.drops[i] * 18 > height + 200:
-                self.drops[i] = random.randint(-10, 0)
-        
-        self.after(120, self.animate)  # Optimized: slower animation for better performance
-    
-    def stop(self):
-        self.running = False
-
-
+# Simple button - no animations for performance
 class AnimatedButton(ctk.CTkButton):
-    """Button with hover glow effect and click animation"""
+    """Simple button (animations removed for performance)"""
     def __init__(self, parent, **kwargs):
-        self.glow_color = kwargs.pop('glow_color', COLORS["accent"])
-        self._original_fg = kwargs.get('fg_color', COLORS["bg_medium"])
-        self._hover_scale = 1.0
+        kwargs.pop('glow_color', None)  # Remove unused param
         super().__init__(parent, **kwargs)
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        self.bind("<Button-1>", self.on_click)
-        self.bind("<ButtonRelease-1>", self.on_release)
-        
-    def on_enter(self, e):
-        self.configure(border_color=self.glow_color, border_width=2)
-        self._animate_hover_in()
-        
-    def on_leave(self, e):
-        self.configure(border_width=0)
-        
-    def on_click(self, e):
-        # Quick pulse effect on click
-        self.configure(fg_color=self.glow_color)
-        
-    def on_release(self, e):
-        self.configure(fg_color=self._original_fg)
-        
-    def _animate_hover_in(self):
-        """Subtle brightness animation on hover"""
-        pass  # Kept simple for performance
 
 
+# Simple card - no animations for performance  
 class AnimatedCard(ctk.CTkFrame):
-    """Card with hover lift and glow animation"""
+    """Simple card frame (animations removed for performance)"""
     def __init__(self, parent, **kwargs):
-        self._hover_border = kwargs.pop('hover_border', COLORS["accent"])
-        self._normal_border = kwargs.get('border_color', COLORS["border"])
-        self._normal_fg = kwargs.get('fg_color', COLORS["bg_medium"])
-        self._hover_fg = kwargs.pop('hover_fg', COLORS["bg_light"])
+        kwargs.pop('hover_border', None)
+        kwargs.pop('hover_fg', None)
         super().__init__(parent, **kwargs)
-        self.bind("<Enter>", self.on_enter)
-        self.bind("<Leave>", self.on_leave)
-        self._is_hovered = False
-        
-    def on_enter(self, e):
-        if not self._is_hovered:
-            self._is_hovered = True
-            self._animate_hover(True)
-    
-    def on_leave(self, e):
-        if self._is_hovered:
-            self._is_hovered = False
-            self._animate_hover(False)
-    
-    def _animate_hover(self, entering):
-        """Smooth hover transition"""
-        if entering:
-            self.configure(
-                border_color=self._hover_border,
-                border_width=2,
-                fg_color=self._hover_fg
-            )
-        else:
-            self.configure(
-                border_color=self._normal_border,
-                border_width=1,
-                fg_color=self._normal_fg
-            )
 
 
 class TransitionManager:
-    """Handles smooth page transitions and animations"""
+    """Transitions disabled for performance"""
     
     @staticmethod
     def fade_in_widget(widget, duration=300, delay=0, start_alpha=0.0):
-        """Fade in a widget by animating from transparent"""
-        def do_fade():
-            widget.configure(fg_color=widget.cget("fg_color"))
-        if delay > 0:
-            widget.after(delay, do_fade)
-        else:
-            do_fade()
+        pass
     
     @staticmethod
     def slide_in_from_right(widget, parent, final_x, duration=300, delay=0):
-        """Slide widget in from right side"""
-        start_x = parent.winfo_width() + 50
-        steps = 15
-        step_delay = duration // steps
-        dx = (start_x - final_x) / steps
+        pass
         
-        def animate(step=0, current_x=start_x):
+    @staticmethod
+    def placeholder(step=0, current_x=0):
             if step >= steps:
                 return
             # Easing function (ease out)
@@ -1254,13 +1134,9 @@ class Launcher(ctk.CTk):
         self.container = ctk.CTkFrame(self, fg_color=COLORS["bg_dark"])
         self.container.pack(fill="both", expand=True)
         
-        # Matrix rain background
-        self.matrix_rain = MatrixRain(self.container)
-        self.matrix_rain.place(relx=0, rely=0, relwidth=1, relheight=1)
-        
-        # Overlay frame for content
-        self.overlay = ctk.CTkFrame(self.container, fg_color="transparent")
-        self.overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        # Simple dark background (no animation for performance)
+        self.overlay = ctk.CTkFrame(self.container, fg_color=COLORS["bg_dark"])
+        self.overlay.pack(fill="both", expand=True)
 
         # Sidebar with terminal style
         sidebar = ctk.CTkFrame(self.overlay, width=100, fg_color=COLORS["bg_medium"], corner_radius=0,
@@ -1383,20 +1259,16 @@ class Launcher(ctk.CTk):
         self.main.pack(fill="both", expand=True)
 
     def blink_cursor(self):
-        """Blinking cursor effect"""
-        current = self.cursor_label.cget("text")
-        self.cursor_label.configure(text="" if current else "█")
-        self.after(500, self.blink_cursor)
+        """Static cursor - no blink for performance"""
+        self.cursor_label.configure(text="█")
     
     def _pulse_status(self):
-        """Update status indicator - green when online, red when offline"""
+        """Update status indicator - no animation"""
         try:
             if self.is_logged_in:
                 self.status_indicator.configure(text="● ONLINE", text_color=COLORS["success"])
             else:
                 self.status_indicator.configure(text="● OFFLINE", text_color=COLORS["error"])
-            
-            self.after(5000, self._pulse_status)  # Check less frequently
         except:
             pass
 
@@ -1439,32 +1311,12 @@ class Launcher(ctk.CTk):
         self._animate_page_in()
     
     def _animate_page_in(self):
-        """Animate page content appearing with stagger effect"""
-        children = self.main.winfo_children()
-        for i, child in enumerate(children):
-            # Start with low opacity effect (using placement)
-            delay = i * 40
-            self.after(delay, lambda c=child: self._slide_widget_in(c))
-    
-    def _slide_widget_in(self, widget):
-        """Slide a widget in with easing"""
-        try:
-            # Quick fade-in simulation using pack/grid reconfiguration
-            widget.configure(fg_color=widget.cget("fg_color"))
-        except:
-            pass
+        """No animation for performance"""
+        pass
     
     def _animate_card_in(self, card, delay=0):
-        """Animate a card sliding in from the right with stagger delay"""
-        # Start invisible/offset
-        original_fg = card.cget("fg_color")
-        card.configure(fg_color=COLORS["bg_dark"])
-        
-        def reveal():
-            # Quick reveal animation
-            card.configure(fg_color=original_fg)
-        
-        self.after(delay + 50, reveal)
+        """No animation for performance"""
+        pass
 
     def nav(self, page):
         self.current_page = page
@@ -1488,72 +1340,27 @@ class Launcher(ctk.CTk):
         self.transition_to(page_map.get(page, self.show_home))
     
     def _animate_nav_select(self, btn):
-        """Animate nav button selection with pulse"""
-        btn.configure(fg_color=COLORS["terminal_green"], text_color=COLORS["bg_dark"])
-        self.after(80, lambda: btn.configure(fg_color=COLORS["accent"]))
-        self.after(160, lambda: btn.configure(fg_color=COLORS["terminal_green"]))
-        self.after(240, lambda: btn.configure(fg_color=COLORS["accent"]))
+        """No animation for performance"""
+        btn.configure(fg_color=COLORS["accent"], text_color=COLORS["bg_dark"])
     
     def _type_title(self, text, speed=25):
-        """Terminal typing effect for title label"""
-        self._typing_text = text
-        self._typing_index = 0
-        self._type_next_char(speed)
-    
-    def _type_next_char(self, speed):
-        """Type next character in title"""
-        if self._typing_index <= len(self._typing_text):
-            displayed = self._typing_text[:self._typing_index]
-            self.title_label.configure(text=displayed + "█")
-            self._typing_index += 1
-            self.after(speed, lambda: self._type_next_char(speed))
-        else:
-            self.title_label.configure(text=self._typing_text)
+        """Set title instantly (no animation for performance)"""
+        self.title_label.configure(text=text)
     
     def _pulse_launch_btn(self):
-        """Static glow on launch button - optimized"""
-        if self.current_page != "home" or not hasattr(self, 'home_launch_btn'):
-            return
-        if self.is_launching:
-            return
-        
-        try:
-            self.home_launch_btn.configure(border_color=COLORS["accent"], border_width=2)
-        except:
-            pass
+        """No animation for performance"""
+        pass
     
     def _animate_hero_glow(self, hero):
-        """Static glow on hero section - optimized"""
-        try:
-            hero.configure(border_color=COLORS["accent"])
-        except:
-            pass
+        """No animation for performance"""
+        pass
     
     def _on_search_focus(self, frame, focused):
-        """Animate search bar on focus/blur"""
+        """Simple border change - no animation"""
         if focused:
             frame.configure(border_color=COLORS["accent"], border_width=2)
-            if hasattr(self, '_search_cursor'):
-                self._blink_search_cursor()
         else:
             frame.configure(border_color=COLORS["border"], border_width=1)
-    
-    def _blink_search_cursor(self):
-        """Blink the search cursor when focused"""
-        if self.current_page != "mods":
-            return
-        try:
-            if not hasattr(self, '_search_cursor'):
-                return
-            current = self._search_cursor.cget("text")
-            self._search_cursor.configure(text="█" if current == ">" else ">")
-            # Only continue if search has focus
-            if self.mod_search.focus_get() == self.mod_search:
-                self.after(400, self._blink_search_cursor)
-            else:
-                self._search_cursor.configure(text=">")
-        except:
-            pass
 
     def clear(self):
         for w in self.main.winfo_children():
@@ -3265,21 +3072,11 @@ Features:
                 self._animate_progress(self.home_prog_bar, val)
     
     def _animate_progress(self, bar, target_val):
-        """Smooth progress bar animation"""
+        """Set progress instantly - no animation"""
         try:
-            current = bar.get()
-            if abs(current - target_val) < 0.01:
-                bar.set(target_val)
-                return
-            
-            # Ease toward target
-            diff = target_val - current
-            step = diff * 0.3  # Smooth interpolation
-            new_val = current + step
-            bar.set(new_val)
-            
-            # Continue animation
-            self.after(30, lambda: self._animate_progress(bar, target_val))
+            bar.set(target_val)
+        except:
+            pass
         except:
             pass
     

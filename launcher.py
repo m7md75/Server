@@ -4,18 +4,15 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.6.0"
+LAUNCHER_VERSION = "2.6.6"
 # ====================================================================
 
 # Supported Minecraft versions
 MC_VERSIONS = [
-    "1.21.4", "1.21.3", "1.21.1", "1.21",
+    "1.21.10", "1.21.8", "1.21.7", "1.21.5", "1.21.4", "1.21.3", "1.21.1", "1.21",
     "1.20.6", "1.20.4", "1.20.2", "1.20.1", "1.20",
     "1.19.4", "1.19.3", "1.19.2", "1.19",
-    "1.18.2", "1.18.1", "1.18",
-    "1.17.1", "1.17",
-    "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1",
-    "1.15.2", "1.14.4", "1.12.2", "1.8.9", "1.7.10"
+    "1.18.2", "1.17.1", "1.12.2", "1.8.9"
 ]
 
 # Mod loaders
@@ -46,27 +43,600 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("green")
 
-# Matrix Colors
-COLORS = {
-    "bg_dark": "#000000",
-    "bg_medium": "#0a0a0a",
-    "bg_light": "#0d1a0d",
-    "bg_card": "#001100",
-    "bg_card_hover": "#002200",
-    "accent": "#00ff00",
-    "accent_dim": "#00aa00",
-    "accent_hover": "#00cc00",
-    "accent2": "#00ff66",
-    "text": "#00ff00",
-    "text2": "#00bb00",
-    "text3": "#007700",
-    "border": "#003300",
-    "success": "#00ff00",
-    "error": "#ff0000",
-    "warning": "#ff9900",
-    "glow": "#00ff00",
-    "terminal_green": "#33ff33",
+# ============== THEME SYSTEM ==============
+# Available themes and color schemes
+
+THEME_COLORS = {
+    "green": {
+        "primary": "#00ff00",
+        "dim": "#00aa00",
+        "hover": "#00cc00",
+        "secondary": "#00ff66",
+        "text": "#00ff00",
+        "text2": "#00bb00",
+        "text3": "#007700",
+        "border": "#003300",
+        "glow": "#33ff33",
+    },
+    "red": {
+        "primary": "#ff0040",
+        "dim": "#aa0030",
+        "hover": "#cc0038",
+        "secondary": "#ff3366",
+        "text": "#ff0040",
+        "text2": "#bb0030",
+        "text3": "#770020",
+        "border": "#330010",
+        "glow": "#ff3355",
+    },
+    "blue": {
+        "primary": "#00aaff",
+        "dim": "#0077aa",
+        "hover": "#0099dd",
+        "secondary": "#00ddff",
+        "text": "#00aaff",
+        "text2": "#0088cc",
+        "text3": "#005577",
+        "border": "#002233",
+        "glow": "#33bbff",
+    },
+    "purple": {
+        "primary": "#aa00ff",
+        "dim": "#7700aa",
+        "hover": "#9900dd",
+        "secondary": "#cc66ff",
+        "text": "#aa00ff",
+        "text2": "#8800cc",
+        "text3": "#550077",
+        "border": "#220033",
+        "glow": "#bb33ff",
+    },
+    "orange": {
+        "primary": "#ff6600",
+        "dim": "#aa4400",
+        "hover": "#dd5500",
+        "secondary": "#ff9933",
+        "text": "#ff6600",
+        "text2": "#cc5500",
+        "text3": "#773300",
+        "border": "#331800",
+        "glow": "#ff8833",
+    },
+    "cyan": {
+        "primary": "#00ffcc",
+        "dim": "#00aa88",
+        "hover": "#00ddaa",
+        "secondary": "#33ffdd",
+        "text": "#00ffcc",
+        "text2": "#00bb99",
+        "text3": "#007755",
+        "border": "#003322",
+        "glow": "#33ffdd",
+    },
+    "pink": {
+        "primary": "#ff00aa",
+        "dim": "#aa0077",
+        "hover": "#dd0099",
+        "secondary": "#ff66cc",
+        "text": "#ff00aa",
+        "text2": "#cc0088",
+        "text3": "#770055",
+        "border": "#330022",
+        "glow": "#ff33bb",
+    },
+    "yellow": {
+        "primary": "#ffcc00",
+        "dim": "#aa8800",
+        "hover": "#ddaa00",
+        "secondary": "#ffdd33",
+        "text": "#ffcc00",
+        "text2": "#cc9900",
+        "text3": "#776600",
+        "border": "#332800",
+        "glow": "#ffdd33",
+    },
 }
+
+THEMES = {
+    "cyber": {
+        "name": "Cyber",
+        "desc": "Matrix digital style",
+        # Background colors
+        "bg_dark": "#000000",
+        "bg_medium": "#0a0a0a",
+        "bg_light_base": "#0d1a0d",
+        "bg_card_base": "#001100",
+        "bg_card_hover_base": "#002200",
+        # Style settings
+        "corner_radius": 8,
+        "border_width": 1,
+        "button_radius": 8,
+        "card_radius": 8,
+        # Effects
+        "use_glow": True,
+        "use_shadows": False,
+        # ========== SIDEBAR ==========
+        "logo_icon": "[W]",
+        "logo_text": "WEJZ",
+        "nav_home": ("[H]", "HOME"),
+        "nav_profiles": ("[P]", "PROFILES"),
+        "nav_play": ("[>]", "PLAY"),
+        "nav_mods": ("[M]", "MODS"),
+        "nav_friends": ("[F]", "FRIENDS"),
+        "nav_settings": ("[S]", "SETTINGS"),
+        "nav_account": ("[?]", "LOGIN"),
+        "status_label": "STATUS:",
+        "status_online": "● ONLINE",
+        "status_offline": "● OFFLINE",
+        # ========== TOP BAR ==========
+        "topbar_prefix": "root@wejz:~$",
+        "profile_label": "[PROFILE]",
+        "user_label": "[USER]",
+        # ========== PAGES ==========
+        "page_home": "./init",
+        "page_profiles": "./profiles",
+        "page_play": "./execute",
+        "page_mods": "./modules",
+        "page_settings": "./config",
+        "page_friends": "./network",
+        "page_account": "./auth",
+        # ========== HOME PAGE ==========
+        "hero_art": """╔═══════════════════════════════════╗
+║   > SYSTEM READY FOR EXECUTION    ║
+║   > ALL MODULES LOADED            ║
+╚═══════════════════════════════════╝""",
+        "launch_button": "[ EXECUTE ]",
+        "launch_hint": "Initialize game process",
+        "label_profile": "[PROFILE]",
+        "label_mods": "[MODULES]",
+        "label_version": "[BUILD]",
+        "label_loader": "[ENGINE]",
+        "label_ram": "[MEMORY]",
+        "info_format": "> {label}: {value}",
+        "section_prefix": "// ",
+        "title_cursor": "█",
+    },
+    "neon": {
+        "name": "Neon",
+        "desc": "Vibrant nightclub style",
+        # Background colors - deep purple
+        "bg_dark": "#0a0010",
+        "bg_medium": "#120020",
+        "bg_light_base": "#1a0030",
+        "bg_card_base": "#150028",
+        "bg_card_hover_base": "#200038",
+        # Style settings - very rounded
+        "corner_radius": 20,
+        "border_width": 2,
+        "button_radius": 25,
+        "card_radius": 20,
+        # Effects
+        "use_glow": True,
+        "use_shadows": True,
+        # ========== SIDEBAR ==========
+        "logo_icon": "✦",
+        "logo_text": "WEJZ",
+        "nav_home": ("★", "Home"),
+        "nav_profiles": ("★", "Profiles"),
+        "nav_play": ("★", "Play"),
+        "nav_mods": ("★", "Mods"),
+        "nav_friends": ("★", "Friends"),
+        "nav_settings": ("★", "Settings"),
+        "nav_account": ("★", "Account"),
+        "status_label": "STATUS",
+        "status_online": "✦ Online",
+        "status_offline": "✦ Offline",
+        # ========== TOP BAR ==========
+        "topbar_prefix": "✦",
+        "profile_label": "Profile",
+        "user_label": "Player",
+        # ========== PAGES ==========
+        "page_home": "✦ Home",
+        "page_profiles": "✦ Profiles",
+        "page_play": "✦ Play",
+        "page_mods": "✦ Mods",
+        "page_settings": "✦ Settings",
+        "page_friends": "✦ Friends",
+        "page_account": "✦ Account",
+        # ========== HOME PAGE ==========
+        "hero_art": """  ✦═══════════════════════════════✦
+         ★ LET'S PLAY ★
+       Your adventure awaits!
+  ✦═══════════════════════════════✦""",
+        "launch_button": "★ PLAY NOW ★",
+        "launch_hint": "Click to start!",
+        "label_profile": "Profile",
+        "label_mods": "Mods",
+        "label_version": "Version",
+        "label_loader": "Loader",
+        "label_ram": "Memory",
+        "info_format": "◆ {label}: {value}",
+        "section_prefix": "◆ ",
+        "title_cursor": "✦",
+    },
+    "retro": {
+        "name": "Retro",
+        "desc": "Classic 90s arcade style",
+        # Background colors - warm grays
+        "bg_dark": "#1a1a1a",
+        "bg_medium": "#252525",
+        "bg_light_base": "#303030",
+        "bg_card_base": "#2a2a2a",
+        "bg_card_hover_base": "#353535",
+        # Style settings - square
+        "corner_radius": 0,
+        "border_width": 3,
+        "button_radius": 0,
+        "card_radius": 0,
+        # Effects
+        "use_glow": False,
+        "use_shadows": True,
+        # ========== SIDEBAR ==========
+        "logo_icon": "◄►",
+        "logo_text": "ARCADE",
+        "nav_home": ("►", "MENU"),
+        "nav_profiles": ("►", "PLAYER"),
+        "nav_play": ("►", "START"),
+        "nav_mods": ("►", "ITEMS"),
+        "nav_friends": ("►", "SCORES"),
+        "nav_settings": ("►", "OPTIONS"),
+        "nav_account": ("►", "P1"),
+        "status_label": "PLAYER 1",
+        "status_online": "■ READY",
+        "status_offline": "□ INSERT COIN",
+        # ========== TOP BAR ==========
+        "topbar_prefix": "►",
+        "profile_label": "PLAYER",
+        "user_label": "NAME",
+        # ========== PAGES ==========
+        "page_home": "MAIN MENU",
+        "page_profiles": "SELECT PLAYER",
+        "page_play": "START GAME",
+        "page_mods": "POWER UPS",
+        "page_settings": "OPTIONS",
+        "page_friends": "HIGH SCORES",
+        "page_account": "PLAYER ID",
+        # ========== HOME PAGE ==========
+        "hero_art": """╔════════════════════════════════════╗
+║  ████ PRESS START ████              ║
+║  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               ║
+║      INSERT COIN TO PLAY            ║
+╚════════════════════════════════════╝""",
+        "launch_button": "► START GAME",
+        "launch_hint": "PRESS BUTTON",
+        "label_profile": "PLAYER",
+        "label_mods": "ITEMS",
+        "label_version": "LEVEL",
+        "label_loader": "MODE",
+        "label_ram": "POWER",
+        "info_format": "► {label}: {value}",
+        "section_prefix": "► ",
+        "title_cursor": "■",
+    },
+    "minimal": {
+        "name": "Minimal",
+        "desc": "Clean modern design",
+        # Background colors - subtle
+        "bg_dark": "#111111",
+        "bg_medium": "#161616",
+        "bg_light_base": "#1c1c1c",
+        "bg_card_base": "#1a1a1a",
+        "bg_card_hover_base": "#222222",
+        # Style settings - subtle rounds
+        "corner_radius": 12,
+        "border_width": 0,
+        "button_radius": 8,
+        "card_radius": 12,
+        # Effects
+        "use_glow": False,
+        "use_shadows": False,
+        # ========== SIDEBAR ==========
+        "logo_icon": "W",
+        "logo_text": "",
+        "nav_home": ("", "Home"),
+        "nav_profiles": ("", "Profiles"),
+        "nav_play": ("", "Play"),
+        "nav_mods": ("", "Mods"),
+        "nav_friends": ("", "Friends"),
+        "nav_settings": ("", "Settings"),
+        "nav_account": ("", "Account"),
+        "status_label": "",
+        "status_online": "Online",
+        "status_offline": "Offline",
+        # ========== TOP BAR ==========
+        "topbar_prefix": "",
+        "profile_label": "Profile",
+        "user_label": "User",
+        # ========== PAGES ==========
+        "page_home": "Home",
+        "page_profiles": "Profiles",
+        "page_play": "Play",
+        "page_mods": "Mods",
+        "page_settings": "Settings",
+        "page_friends": "Friends",
+        "page_account": "Account",
+        # ========== HOME PAGE ==========
+        "hero_art": """Ready to play
+
+Your game is set up and ready to launch.""",
+        "launch_button": "Play",
+        "launch_hint": "",
+        "label_profile": "Profile",
+        "label_mods": "Mods",
+        "label_version": "Version",
+        "label_loader": "Loader",
+        "label_ram": "Memory",
+        "info_format": "{label}: {value}",
+        "section_prefix": "",
+        "title_cursor": "|",
+    },
+    "hacker": {
+        "name": "Hacker",
+        "desc": "Terminal CLI interface",
+        # Background colors - pure black
+        "bg_dark": "#000000",
+        "bg_medium": "#000000",
+        "bg_light_base": "#050505",
+        "bg_card_base": "#000000",
+        "bg_card_hover_base": "#0a0a0a",
+        # Style settings - no curves
+        "corner_radius": 0,
+        "border_width": 1,
+        "button_radius": 0,
+        "card_radius": 0,
+        # Effects
+        "use_glow": False,
+        "use_shadows": False,
+        # ========== SIDEBAR ==========
+        "logo_icon": "$",
+        "logo_text": "wejz",
+        "nav_home": ("~", "home"),
+        "nav_profiles": ("/", "users"),
+        "nav_play": ("./", "run"),
+        "nav_mods": ("/", "mods"),
+        "nav_friends": ("@", "net"),
+        "nav_settings": ("/", "etc"),
+        "nav_account": ("$", "auth"),
+        "status_label": "PID:",
+        "status_online": "[OK]",
+        "status_offline": "[--]",
+        # ========== TOP BAR ==========
+        "topbar_prefix": "wejz@localhost:~$",
+        "profile_label": "$USER",
+        "user_label": "$NAME",
+        # ========== PAGES ==========
+        "page_home": "~/$",
+        "page_profiles": "cat /etc/users",
+        "page_play": "./minecraft.sh",
+        "page_mods": "ls mods/",
+        "page_settings": "nano config",
+        "page_friends": "who",
+        "page_account": "whoami",
+        # ========== HOME PAGE ==========
+        "hero_art": """┌──────────────────────────────────────┐
+│ $ ./status                          │
+│ [OK] All systems operational        │
+│ [OK] Minecraft ready                │
+│ $ _                                 │
+└──────────────────────────────────────┘""",
+        "launch_button": "./launch.sh",
+        "launch_hint": "exec minecraft",
+        "label_profile": "$USER",
+        "label_mods": "$MODS",
+        "label_version": "$VER",
+        "label_loader": "$LOADER",
+        "label_ram": "$MEM",
+        "info_format": "echo ${label}  # {value}",
+        "section_prefix": "# ",
+        "title_cursor": "_",
+    },
+}
+
+# Current theme settings (default: cyber + green)
+CURRENT_THEME = "cyber"
+CURRENT_COLOR = "green"
+
+def get_colors(theme_name=None, color_name=None):
+    """Generate COLORS dict based on theme and color scheme"""
+    theme = THEMES.get(theme_name or CURRENT_THEME, THEMES["cyber"])
+    color = THEME_COLORS.get(color_name or CURRENT_COLOR, THEME_COLORS["green"])
+    
+    return {
+        # Background colors
+        "bg_dark": theme["bg_dark"],
+        "bg_medium": theme["bg_medium"],
+        "bg_light": theme["bg_light_base"],
+        "bg_card": theme["bg_card_base"],
+        "bg_card_hover": theme["bg_card_hover_base"],
+        # Accent colors from color scheme
+        "accent": color["primary"],
+        "accent_dim": color["dim"],
+        "accent_hover": color["hover"],
+        "accent2": color["secondary"],
+        "text": color["text"],
+        "text2": color["text2"],
+        "text3": color["text3"],
+        "border": color["border"],
+        "success": "#00ff00",
+        "error": "#ff0000",
+        "warning": "#ff9900",
+        "glow": color["glow"],
+        "terminal_green": color["glow"],
+    }
+
+def get_style():
+    """Get current theme style settings"""
+    theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+    return {
+        # Shape settings
+        "corner_radius": theme.get("corner_radius", 10),
+        "border_width": theme.get("border_width", 1),
+        "button_radius": theme.get("button_radius", 10),
+        "card_radius": theme.get("card_radius", 10),
+        # Card settings
+        "card_style": theme.get("card_style", "bordered"),
+        # Button settings
+        "button_style": theme.get("button_style", "filled"),
+        # Effects
+        "use_glow": theme.get("use_glow", True),
+        "use_shadows": theme.get("use_shadows", False),
+        # Section prefix
+        "section_prefix": theme.get("section_prefix", "// "),
+    }
+
+# Style helper functions
+def style_title(text):
+    """Format title text according to current theme"""
+    theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+    prefix = theme.get("section_prefix", "")
+    return f"{prefix}{text}"
+
+def style_section(text):
+    """Format section text according to current theme"""
+    theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+    return f"{theme.get('section_prefix', '')}{text}"
+
+def style_label(text):
+    """Format label text according to current theme"""
+    theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+    prefix = theme.get("section_prefix", "")
+    return f"{prefix}{text}" if prefix else text
+
+def style_button(text):
+    """Format button text according to current theme"""
+    theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+    # Get button style from theme
+    if CURRENT_THEME == "cyber":
+        return f"[ {text} ]"
+    elif CURRENT_THEME == "neon":
+        return f"★ {text} ★"
+    elif CURRENT_THEME == "retro":
+        return f"► {text}"
+    elif CURRENT_THEME == "hacker":
+        return f"./{text.lower()}.sh"
+    elif CURRENT_THEME == "minimal":
+        return text
+    else:
+        return f"[ {text} ]"
+
+def get_card_colors():
+    """Get card colors based on current theme style"""
+    style = get_style()
+    card_style = style["card_style"]
+    
+    if card_style == "glass":
+        # Semi-transparent glass effect
+        return {
+            "fg": COLORS["bg_card"],
+            "border": COLORS["accent_dim"],
+            "border_width": style["border_width"],
+        }
+    elif card_style == "filled":
+        # Solid filled card
+        return {
+            "fg": COLORS["bg_medium"],
+            "border": COLORS["bg_medium"],
+            "border_width": 0,
+        }
+    elif card_style == "outlined":
+        # Just border, transparent bg
+        return {
+            "fg": "transparent",
+            "border": COLORS["border"],
+            "border_width": style["border_width"],
+        }
+    elif card_style == "3d":
+        # 3D raised effect
+        return {
+            "fg": COLORS["bg_card"],
+            "border": COLORS["text3"],
+            "border_width": style["border_width"],
+        }
+    elif card_style == "minimal":
+        # Almost invisible
+        return {
+            "fg": COLORS["bg_dark"],
+            "border": COLORS["border"],
+            "border_width": 1,
+        }
+    else:  # bordered (default)
+        return {
+            "fg": COLORS["bg_medium"],
+            "border": COLORS["border"],
+            "border_width": style["border_width"],
+        }
+
+def get_button_colors(is_primary=True):
+    """Get button colors based on current theme style"""
+    style = get_style()
+    btn_style = style["button_style"]
+    
+    if btn_style == "gradient":
+        return {
+            "fg": COLORS["accent"] if is_primary else COLORS["accent_dim"],
+            "hover": COLORS["accent_hover"],
+            "text": COLORS["bg_dark"],
+            "border": 0,
+        }
+    elif btn_style == "outlined":
+        return {
+            "fg": "transparent",
+            "hover": COLORS["accent_dim"],
+            "text": COLORS["accent"],
+            "border": 2,
+        }
+    elif btn_style == "3d":
+        return {
+            "fg": COLORS["accent_dim"] if is_primary else COLORS["bg_card"],
+            "hover": COLORS["accent"],
+            "text": COLORS["text"] if not is_primary else COLORS["bg_dark"],
+            "border": 0,
+        }
+    elif btn_style == "minimal":
+        return {
+            "fg": "transparent",
+            "hover": COLORS["bg_card_hover"],
+            "text": COLORS["accent"],
+            "border": 0,
+        }
+    else:  # filled (default)
+        return {
+            "fg": COLORS["accent"] if is_primary else COLORS["accent_dim"],
+            "hover": COLORS["accent_hover"],
+            "text": COLORS["bg_dark"],
+            "border": 0,
+        }
+
+# Current style cache (updated when theme changes)
+STYLE = {}
+
+def load_theme_settings():
+    """Load theme settings from file"""
+    global CURRENT_THEME, CURRENT_COLOR
+    try:
+        theme_file = Path("launcher_theme.json")
+        if theme_file.exists():
+            with open(theme_file) as f:
+                data = json.load(f)
+                CURRENT_THEME = data.get("theme", "cyber")
+                CURRENT_COLOR = data.get("color", "green")
+    except:
+        pass
+
+def save_theme_settings():
+    """Save theme settings to file"""
+    try:
+        with open("launcher_theme.json", "w") as f:
+            json.dump({"theme": CURRENT_THEME, "color": CURRENT_COLOR}, f)
+    except:
+        pass
+
+# Load theme on startup
+load_theme_settings()
+
+# Initialize COLORS and STYLE with current theme
+COLORS = get_colors()
+STYLE = get_style()
 
 # Font Configuration - Load Minecraft Ten from local TTF file
 FONT_FALLBACK = "Consolas"
@@ -1085,125 +1655,151 @@ class Launcher(ctk.CTk):
         (path / "username.txt").write_text(self.username)
 
     def build_ui(self):
+        # Get current theme settings
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        style = get_style()
+        
         # Main container
         self.container = ctk.CTkFrame(self, fg_color=COLORS["bg_dark"])
         self.container.pack(fill="both", expand=True)
         
-        # Simple dark background (no animation for performance)
+        # Simple dark background
         self.overlay = ctk.CTkFrame(self.container, fg_color=COLORS["bg_dark"])
         self.overlay.pack(fill="both", expand=True)
 
-        # Sidebar with terminal style
-        sidebar = ctk.CTkFrame(self.overlay, width=100, fg_color=COLORS["bg_medium"], corner_radius=0,
-                              border_width=2, border_color=COLORS["border"])
+        # Sidebar - styled by theme
+        sidebar = ctk.CTkFrame(self.overlay, width=100, fg_color=COLORS["bg_medium"], 
+                              corner_radius=style["corner_radius"],
+                              border_width=style["border_width"], border_color=COLORS["border"])
         sidebar.pack(side="left", fill="y", padx=(10, 0), pady=10)
         sidebar.pack_propagate(False)
 
-        # Logo
+        # Logo - theme specific
         logo_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
         logo_frame.pack(pady=20)
-        ctk.CTkLabel(logo_frame, text="[W]", font=get_font(24, "bold"), 
+        ctk.CTkLabel(logo_frame, text=theme.get("logo_icon", "[W]"), font=get_font(24, "bold"), 
                     text_color=COLORS["accent"]).pack()
-        ctk.CTkLabel(logo_frame, text="WEJZ", font=get_font(10, "bold"), 
-                    text_color=COLORS["text2"]).pack()
+        logo_text = theme.get("logo_text", "WEJZ")
+        if logo_text:
+            ctk.CTkLabel(logo_frame, text=logo_text, font=get_font(10, "bold"), 
+                        text_color=COLORS["text2"]).pack()
         
         # Separator
         ctk.CTkFrame(sidebar, fg_color=COLORS["accent"], height=2).pack(fill="x", padx=15, pady=10)
 
-        # Navigation buttons with terminal style
+        # Navigation buttons - theme specific text
         self.nav_btns = {}
-        nav_items = [
-            ("home", "[H]", "HOME"),
-            ("profiles", "[P]", "PROFILES"),
-            ("play", "[>]", "PLAY"),
-            ("mods", "[M]", "MODS"),
-            ("friends", "[F]", "FRIENDS"),
-            ("settings", "[S]", "SETTINGS")
-        ]
+        nav_keys = ["home", "profiles", "play", "mods", "friends", "settings"]
         
-        for key, icon, label in nav_items:
+        for key in nav_keys:
+            nav_data = theme.get(f"nav_{key}", ("", key.title()))
+            icon, label = nav_data
+            
             btn_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
             btn_frame.pack(pady=5, padx=5, fill="x")
             
-            btn = AnimatedButton(btn_frame, text=f"{icon}\n{label}", font=get_font(11, "bold"),
+            # Format button text based on theme
+            if icon:
+                btn_text = f"{icon}\n{label}"
+            else:
+                btn_text = label
+            
+            btn = AnimatedButton(btn_frame, text=btn_text, font=get_font(11, "bold"),
                 fg_color="transparent", hover_color=COLORS["bg_light"], 
-                text_color=COLORS["text3"], height=60, corner_radius=8,
-                glow_color=COLORS["accent"], command=lambda k=key: self.nav(k))
+                text_color=COLORS["text3"], height=60, corner_radius=style["button_radius"],
+                glow_color=COLORS["accent"] if style["use_glow"] else None, 
+                command=lambda k=key: self.nav(k))
             btn.pack(fill="x")
             self.nav_btns[key] = btn
 
-        # Account button at bottom
+        # Account button at bottom - theme specific
         account_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
         account_frame.pack(side="bottom", pady=(0, 5), fill="x", padx=5)
         
-        self.account_btn = AnimatedButton(account_frame, text="[?]\nLOGIN", font=get_font(10, "bold"),
+        acc_data = theme.get("nav_account", ("[?]", "LOGIN"))
+        acc_icon, acc_label = acc_data
+        acc_text = f"{acc_icon}\n{acc_label}" if acc_icon else acc_label
+        
+        self.account_btn = AnimatedButton(account_frame, text=acc_text, font=get_font(10, "bold"),
             fg_color="transparent", hover_color=COLORS["bg_light"], 
-            text_color=COLORS["text3"], height=50, corner_radius=8,
-            glow_color=COLORS["accent"], command=lambda: self.nav("account"))
+            text_color=COLORS["text3"], height=50, corner_radius=style["button_radius"],
+            glow_color=COLORS["accent"] if style["use_glow"] else None, 
+            command=lambda: self.nav("account"))
         self.account_btn.pack(fill="x")
         self.nav_btns["account"] = self.account_btn
         
-        # Status indicator at bottom with pulse animation
+        # Status indicator - theme specific
         status_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
         status_frame.pack(side="bottom", pady=(5, 20), fill="x")
-        ctk.CTkLabel(status_frame, text="STATUS:", font=get_font(8), 
-                    text_color=COLORS["text3"]).pack()
-        self.status_indicator = ctk.CTkLabel(status_frame, text="● OFFLINE", 
+        status_label = theme.get("status_label", "STATUS:")
+        if status_label:
+            ctk.CTkLabel(status_frame, text=status_label, font=get_font(8), 
+                        text_color=COLORS["text3"]).pack()
+        self.status_indicator = ctk.CTkLabel(status_frame, text=theme.get("status_offline", "● OFFLINE"), 
                     font=get_font(9, "bold"), text_color=COLORS["error"])
         self.status_indicator.pack()
         
-        # Start status pulse animation
         self._pulse_status()
 
         # Content area
         self.content = ctk.CTkFrame(self.overlay, fg_color="transparent")
         self.content.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
-        # Top bar - terminal style header
+        # Top bar - styled by theme
         top = ctk.CTkFrame(self.content, fg_color=COLORS["bg_card"], height=70, 
-                          corner_radius=10, border_width=1, border_color=COLORS["border"])
+                          corner_radius=style["card_radius"], 
+                          border_width=style["border_width"], border_color=COLORS["border"])
         top.pack(fill="x", pady=(0, 10))
         top.pack_propagate(False)
 
         top_inner = ctk.CTkFrame(top, fg_color="transparent")
         top_inner.pack(fill="both", expand=True, padx=20)
 
-        # Title with terminal prefix
+        # Title with theme-specific prefix
         title_frame = ctk.CTkFrame(top_inner, fg_color="transparent")
         title_frame.pack(side="left", fill="y", pady=15)
         
-        ctk.CTkLabel(title_frame, text="root@wejz:~$", font=get_font(11), 
-                    text_color=COLORS["text3"]).pack(side="left")
-        self.title_label = ctk.CTkLabel(title_frame, text=" ./home", font=get_font(16, "bold"), 
+        topbar_prefix = theme.get("topbar_prefix", "")
+        if topbar_prefix:
+            ctk.CTkLabel(title_frame, text=topbar_prefix, font=get_font(11), 
+                        text_color=COLORS["text3"]).pack(side="left")
+        self.title_label = ctk.CTkLabel(title_frame, text=" ", font=get_font(16, "bold"), 
                     text_color=COLORS["accent"])
         self.title_label.pack(side="left")
         
-        # Blinking cursor
-        self.cursor_label = ctk.CTkLabel(title_frame, text="█", font=get_font(16, "bold"), 
+        # Blinking cursor - theme specific
+        cursor_char = theme.get("title_cursor", "█")
+        self.cursor_label = ctk.CTkLabel(title_frame, text=cursor_char, font=get_font(16, "bold"), 
                     text_color=COLORS["accent"])
         self.cursor_label.pack(side="left")
         self.blink_cursor()
 
-        # Profile selector
-        prof_frame = ctk.CTkFrame(top_inner, fg_color=COLORS["bg_light"], corner_radius=8,
-                                 border_width=1, border_color=COLORS["border"])
+        # Profile selector - theme specific labels
+        prof_frame = ctk.CTkFrame(top_inner, fg_color=COLORS["bg_light"], 
+                                 corner_radius=style["corner_radius"],
+                                 border_width=style["border_width"], border_color=COLORS["border"])
         prof_frame.pack(side="right", pady=15)
-        ctk.CTkLabel(prof_frame, text="[PROFILE]", font=get_font(9), 
-                    text_color=COLORS["text3"]).pack(side="left", padx=(10, 5))
+        profile_label = theme.get("profile_label", "Profile")
+        if profile_label:
+            ctk.CTkLabel(prof_frame, text=profile_label, font=get_font(9), 
+                        text_color=COLORS["text3"]).pack(side="left", padx=(10, 5))
         self.profile_menu = ctk.CTkOptionMenu(prof_frame, values=list(self.profiles.get_all().keys()),
             command=self.on_profile_change, font=get_font(11), fg_color=COLORS["bg_medium"],
             button_color=COLORS["accent_dim"], dropdown_fg_color=COLORS["bg_card"],
             dropdown_hover_color=COLORS["bg_card_hover"], width=130, height=30,
-            text_color=COLORS["text"])
+            text_color=COLORS["text"], corner_radius=style["corner_radius"])
         self.profile_menu.set(self.current_profile)
         self.profile_menu.pack(side="left", padx=(0, 10), pady=6)
 
-        # User display
-        user_frame = ctk.CTkFrame(top_inner, fg_color=COLORS["bg_light"], corner_radius=8,
-                                 border_width=1, border_color=COLORS["border"])
+        # User display - theme specific
+        user_frame = ctk.CTkFrame(top_inner, fg_color=COLORS["bg_light"], 
+                                 corner_radius=style["corner_radius"],
+                                 border_width=style["border_width"], border_color=COLORS["border"])
         user_frame.pack(side="right", padx=(0, 10), pady=15)
-        ctk.CTkLabel(user_frame, text="[USER]", font=get_font(9), 
-                    text_color=COLORS["text3"]).pack(side="left", padx=(10, 5))
+        user_label = theme.get("user_label", "User")
+        if user_label:
+            ctk.CTkLabel(user_frame, text=user_label, font=get_font(9), 
+                        text_color=COLORS["text3"]).pack(side="left", padx=(10, 5))
         self.user_label = ctk.CTkLabel(user_frame, text=self.username, font=get_font(11, "bold"), 
                     text_color=COLORS["accent"])
         self.user_label.pack(side="left", padx=(0, 10), pady=6)
@@ -1214,16 +1810,23 @@ class Launcher(ctk.CTk):
         self.main.pack(fill="both", expand=True)
 
     def blink_cursor(self):
-        """Static cursor - no blink for performance"""
-        self.cursor_label.configure(text="█")
+        """Static cursor - uses theme cursor"""
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        cursor = theme.get("title_cursor", "█")
+        self.cursor_label.configure(text=cursor)
     
     def _pulse_status(self):
-        """Update status indicator - no animation"""
+        """Update status indicator - uses theme text"""
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
         try:
             if self.is_logged_in:
-                self.status_indicator.configure(text="● ONLINE", text_color=COLORS["success"])
+                self.status_indicator.configure(
+                    text=theme.get("status_online", "● ONLINE"), 
+                    text_color=COLORS["success"])
             else:
-                self.status_indicator.configure(text="● OFFLINE", text_color=COLORS["error"])
+                self.status_indicator.configure(
+                    text=theme.get("status_offline", "● OFFLINE"), 
+                    text_color=COLORS["error"])
         except:
             pass
 
@@ -1299,16 +1902,22 @@ class Launcher(ctk.CTk):
         btn.configure(fg_color=COLORS["accent"], text_color=COLORS["bg_dark"])
     
     def _type_title(self, text, speed=25):
-        """Terminal typing effect for title label"""
-        self._typing_text = text
+        """Terminal typing effect for title label - uses theme's page titles directly"""
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        # The text passed is already the theme's formatted page title
+        formatted = f" {text}"
+        self._typing_text = formatted
         self._typing_index = 0
         self._type_next_char(speed)
     
     def _type_next_char(self, speed):
         """Type next character in title"""
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        cursor = theme.get("title_cursor", "█")
+        
         if self._typing_index <= len(self._typing_text):
             displayed = self._typing_text[:self._typing_index]
-            self.title_label.configure(text=displayed + "█")
+            self.title_label.configure(text=displayed + cursor)
             self._typing_index += 1
             self.after(speed, lambda: self._type_next_char(speed))
         else:
@@ -1335,43 +1944,53 @@ class Launcher(ctk.CTk):
 
     def show_home(self):
         self.clear()
-        self._type_title(" ./welcome")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_home", "Home"))
+        
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "home" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "home" else COLORS["text3"])
 
         prof = self.profiles.get(self.current_profile) or {"version": "1.20.4", "mods": [], "ram": 4, "loader": "fabric"}
+        style = get_style()
+        card_colors = get_card_colors()
+        btn_colors = get_button_colors(True)
 
         # Inner padding frame
         inner = ctk.CTkFrame(self.main, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=25, pady=25)
 
-        # Hero section - terminal style with entrance animation
-        hero = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], corner_radius=15, 
-                           border_width=1, border_color=COLORS["accent"], height=200)
+        # Hero section
+        hero = ctk.CTkFrame(inner, fg_color=card_colors["fg"], 
+                           corner_radius=style["card_radius"], 
+                           border_width=style["border_width"] + 1, 
+                           border_color=COLORS["accent"], height=200)
         hero.pack(fill="x", pady=(0, 20))
         hero.pack_propagate(False)
         
-        # Animate hero border glow
         self._animate_hero_glow(hero)
 
         hero_inner = ctk.CTkFrame(hero, fg_color="transparent")
         hero_inner.pack(fill="both", expand=True, padx=30, pady=25)
 
-        # ASCII art style title
-        title_art = """
- ╔═══════════════════════════════════╗
- ║   SYSTEM READY FOR EXECUTION      ║
- ╚═══════════════════════════════════╝"""
-        
-        ctk.CTkLabel(hero_inner, text=title_art, font=(FONT_FALLBACK, 12), 
+        # Theme-specific hero art from theme config
+        hero_art = theme.get("hero_art", "Ready to play")
+        ctk.CTkLabel(hero_inner, text=hero_art, font=(FONT_FALLBACK, 12), 
                     text_color=COLORS["accent"], justify="left").pack(anchor="w")
 
-        # System info
+        # System info using theme's info format
         info_frame = ctk.CTkFrame(hero_inner, fg_color="transparent")
         info_frame.pack(anchor="w", pady=(15, 0))
         
-        info_text = f"> Profile: {self.current_profile}\n> Version: {prof['version']}\n> Mods: {len(prof['mods'])} loaded\n> Memory: {prof['ram']}GB allocated"
+        info_format = theme.get("info_format", "{label}: {value}")
+        info_lines = [
+            info_format.format(label=theme.get("label_profile", "Profile"), value=self.current_profile),
+            info_format.format(label=theme.get("label_version", "Version"), value=prof['version']),
+            info_format.format(label=theme.get("label_mods", "Mods"), value=f"{len(prof['mods'])}"),
+            info_format.format(label=theme.get("label_ram", "RAM"), value=f"{prof['ram']}GB"),
+        ]
+        info_text = "\n".join(info_lines)
+        
         ctk.CTkLabel(info_frame, text=info_text, font=get_font(12), 
                     text_color=COLORS["text2"], justify="left").pack(anchor="w")
 
@@ -1381,40 +2000,45 @@ class Launcher(ctk.CTk):
                     text_color=COLORS["accent"])
         self.home_prog_label.pack(anchor="w")
         self.home_prog_bar = ctk.CTkProgressBar(self.home_prog_frame, fg_color=COLORS["bg_dark"],
-            progress_color=COLORS["accent"], height=8, width=400)
+            progress_color=COLORS["accent"], height=8, width=400, corner_radius=style["corner_radius"]//2)
         self.home_prog_bar.pack(anchor="w", pady=(5, 0))
         self.home_prog_bar.set(0)
 
-        # Launch button - big and prominent with pulse effect
+        # Launch button using theme's button text
         btn_frame = ctk.CTkFrame(hero, fg_color="transparent")
         btn_frame.pack(side="right", padx=30)
         
-        self.home_launch_btn = AnimatedButton(btn_frame, text="[ EXECUTE ]", font=get_font(18, "bold"),
-            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"],
-            width=180, height=70, corner_radius=10, glow_color=COLORS["terminal_green"],
+        launch_text = theme.get("launch_button", "Play")
+        self.home_launch_btn = AnimatedButton(btn_frame, text=launch_text, font=get_font(18, "bold"),
+            fg_color=btn_colors["fg"], hover_color=btn_colors["hover"], text_color=btn_colors["text"],
+            width=180, height=70, corner_radius=style["button_radius"], 
+            glow_color=COLORS["glow"] if style["use_glow"] else None,
             command=self.launch)
         self.home_launch_btn.pack()
         
-        ctk.CTkLabel(btn_frame, text="Press to launch game", font=get_font(9), 
-                    text_color=COLORS["text3"]).pack(pady=(5, 0))
+        hint_text = theme.get("launch_hint", "")
+        if hint_text:
+            ctk.CTkLabel(btn_frame, text=hint_text, font=get_font(9), 
+                        text_color=COLORS["text3"]).pack(pady=(5, 0))
         
-        # Start subtle pulse animation on launch button
         self._pulse_launch_btn()
 
-        # Stats grid with staggered animation
+        # Stats grid using theme labels
         stats = ctk.CTkFrame(inner, fg_color="transparent")
         stats.pack(fill="x", pady=(0, 20))
         
         stats_data = [
-            ("[PROFILE]", self.current_profile, COLORS["accent"]),
-            ("[MODS]", f"{len(prof['mods'])} active", COLORS["accent2"]),
-            ("[VERSION]", prof['version'], COLORS["success"]),
-            ("[LOADER]", prof.get('loader', 'fabric').upper(), COLORS["text2"]),
+            (theme.get("label_profile", "Profile"), self.current_profile, COLORS["accent"]),
+            (theme.get("label_mods", "Mods"), f"{len(prof['mods'])}", COLORS["accent2"]),
+            (theme.get("label_version", "Version"), prof['version'], COLORS["success"]),
+            (theme.get("label_loader", "Loader"), prof.get('loader', 'fabric').upper() if CURRENT_THEME != "minimal" else prof.get('loader', 'fabric').title(), COLORS["text2"]),
         ]
         
         for idx, (title, value, color) in enumerate(stats_data):
-            card = AnimatedCard(stats, fg_color=COLORS["bg_medium"], corner_radius=10,
-                               border_width=1, border_color=COLORS["border"], height=90,
+            card = AnimatedCard(stats, fg_color=card_colors["fg"], 
+                               corner_radius=style["card_radius"],
+                               border_width=card_colors["border_width"], 
+                               border_color=card_colors["border"], height=90,
                                hover_border=color, hover_fg=COLORS["bg_light"])
             card.pack(side="left", expand=True, fill="x", padx=(0, 10))
             card.pack_propagate(False)
@@ -1451,7 +2075,8 @@ class Launcher(ctk.CTk):
 
     def show_profiles(self):
         self.clear()
-        self._type_title(" ./profiles")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_profiles", "Profiles"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "profiles" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "profiles" else COLORS["text3"])
@@ -1587,7 +2212,9 @@ class Launcher(ctk.CTk):
 
     def edit_profile(self, name):
         self.clear()
-        self._type_title(f" ./edit/{name}")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        prefix = theme.get("section_prefix", "")
+        self._type_title(f"{prefix}Edit: {name}")
 
         prof = self.profiles.get(name)
         if not prof:
@@ -1712,7 +2339,8 @@ class Launcher(ctk.CTk):
 
     def show_play(self):
         self.clear()
-        self._type_title(" ./execute")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_play", "Play"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "play" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "play" else COLORS["text3"])
@@ -1815,7 +2443,8 @@ class Launcher(ctk.CTk):
 
     def show_mods(self):
         self.clear()
-        self._type_title(" ./mods")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_mods", "Mods"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "mods" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "mods" else COLORS["text3"])
@@ -2127,59 +2756,153 @@ class Launcher(ctk.CTk):
 
     def show_settings(self):
         self.clear()
-        self._type_title(" ./config")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_settings", "Settings"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "settings" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "settings" else COLORS["text3"])
 
-        inner = ctk.CTkFrame(self.main, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=25, pady=25)
+        style = get_style()
+        
+        # Create scrollable frame for settings
+        scroll_frame = ctk.CTkScrollableFrame(self.main, fg_color="transparent")
+        scroll_frame.pack(fill="both", expand=True, padx=25, pady=25)
 
-        card = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], corner_radius=10,
-                           border_width=1, border_color=COLORS["border"])
+        inner = scroll_frame
+
+        # System Config Card
+        card = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], 
+                           corner_radius=style["card_radius"],
+                           border_width=style["border_width"], border_color=COLORS["border"])
         card.pack(fill="x", pady=(0, 20))
         card_inner = ctk.CTkFrame(card, fg_color="transparent")
         card_inner.pack(fill="x", padx=20, pady=20)
 
-        ctk.CTkLabel(card_inner, text="> SYSTEM_CONFIG", font=get_font(14, "bold"), 
+        ctk.CTkLabel(card_inner, text=style_title("SYSTEM_CONFIG"), font=get_font(14, "bold"), 
                     text_color=COLORS["accent"]).pack(anchor="w", pady=(0, 15))
 
         # Java path
         row1 = ctk.CTkFrame(card_inner, fg_color="transparent")
         row1.pack(fill="x", pady=10)
-        ctk.CTkLabel(row1, text="JAVA_PATH:", font=get_font(11), 
+        ctk.CTkLabel(row1, text=style_label("JAVA_PATH"), font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
         self.java_entry = ctk.CTkEntry(row1, fg_color=COLORS["bg_dark"], border_color=COLORS["border"],
-            text_color=COLORS["text"], width=350, height=42, font=get_font(11))
+            text_color=COLORS["text"], width=350, height=42, font=get_font(11),
+            corner_radius=style["corner_radius"])
         self.java_entry.insert(0, self.settings["java"])
         self.java_entry.pack(side="right")
 
         # Game dir
         row2 = ctk.CTkFrame(card_inner, fg_color="transparent")
         row2.pack(fill="x", pady=10)
-        ctk.CTkLabel(row2, text="GAME_DIR:", font=get_font(11), 
+        ctk.CTkLabel(row2, text=style_label("GAME_DIR"), font=get_font(11), 
                     text_color=COLORS["text2"]).pack(side="left")
         self.dir_entry = ctk.CTkEntry(row2, fg_color=COLORS["bg_dark"], border_color=COLORS["border"],
-            text_color=COLORS["text"], width=400, height=42, font=get_font(11))
+            text_color=COLORS["text"], width=400, height=42, font=get_font(11),
+            corner_radius=style["corner_radius"])
         self.dir_entry.insert(0, self.settings["game_dir"])
         self.dir_entry.pack(side="right")
 
-        ctk.CTkLabel(card_inner, text="// Java 17+ required for Minecraft 1.18+",
+        ctk.CTkLabel(card_inner, text=style_section("Java 17+ required for Minecraft 1.18+"),
             font=get_font(10), text_color=COLORS["text3"]).pack(anchor="w", pady=(15, 0))
 
-        AnimatedButton(inner, text="[ SAVE CONFIG ]", font=get_font(14, "bold"),
+        # Theme Settings Card
+        theme_card = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], 
+                                 corner_radius=style["card_radius"],
+                                 border_width=style["border_width"], border_color=COLORS["border"])
+        theme_card.pack(fill="x", pady=(0, 20))
+        theme_inner = ctk.CTkFrame(theme_card, fg_color="transparent")
+        theme_inner.pack(fill="x", padx=20, pady=20)
+
+        ctk.CTkLabel(theme_inner, text=style_title("THEME_CONFIG"), font=get_font(14, "bold"), 
+                    text_color=COLORS["accent"]).pack(anchor="w", pady=(0, 15))
+
+        # Theme selection
+        theme_row = ctk.CTkFrame(theme_inner, fg_color="transparent")
+        theme_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(theme_row, text=style_label("THEME"), font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        
+        theme_names = [THEMES[t]["name"] for t in THEMES.keys()]
+        self.theme_var = ctk.StringVar(value=THEMES[CURRENT_THEME]["name"])
+        self.theme_menu = ctk.CTkOptionMenu(theme_row, values=theme_names,
+            variable=self.theme_var,
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"],
+            dropdown_fg_color=COLORS["bg_card"], width=150, height=42, font=get_font(11),
+            text_color=COLORS["text"], command=self._preview_theme,
+            corner_radius=style["corner_radius"])
+        self.theme_menu.pack(side="right")
+
+        # Theme description label
+        self.theme_desc_label = ctk.CTkLabel(theme_inner, 
+            text=style_section(THEMES[CURRENT_THEME].get("desc", "")),
+            font=get_font(10), text_color=COLORS["text3"])
+        self.theme_desc_label.pack(anchor="w", pady=(5, 10))
+
+        # Color selection
+        color_row = ctk.CTkFrame(theme_inner, fg_color="transparent")
+        color_row.pack(fill="x", pady=10)
+        ctk.CTkLabel(color_row, text=style_label("COLOR"), font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        
+        color_names = [c.capitalize() for c in THEME_COLORS.keys()]
+        self.color_var = ctk.StringVar(value=CURRENT_COLOR.capitalize())
+        self.color_menu = ctk.CTkOptionMenu(color_row, values=color_names,
+            variable=self.color_var,
+            fg_color=COLORS["bg_dark"], button_color=COLORS["accent_dim"],
+            dropdown_fg_color=COLORS["bg_card"], width=150, height=42, font=get_font(11),
+            text_color=COLORS["text"], command=self._preview_theme,
+            corner_radius=style["corner_radius"])
+        self.color_menu.pack(side="right")
+
+        # Color preview boxes
+        preview_row = ctk.CTkFrame(theme_inner, fg_color="transparent")
+        preview_row.pack(fill="x", pady=(15, 5))
+        ctk.CTkLabel(preview_row, text=style_label("PREVIEW"), font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        
+        self.color_preview_frame = ctk.CTkFrame(preview_row, fg_color="transparent")
+        self.color_preview_frame.pack(side="right")
+        self._update_color_preview()
+
+        # Theme style preview
+        style_preview_row = ctk.CTkFrame(theme_inner, fg_color="transparent")
+        style_preview_row.pack(fill="x", pady=(10, 5))
+        ctk.CTkLabel(style_preview_row, text=style_label("STYLE"), font=get_font(11), 
+                    text_color=COLORS["text2"]).pack(side="left")
+        
+        self.style_preview_frame = ctk.CTkFrame(style_preview_row, fg_color="transparent")
+        self.style_preview_frame.pack(side="right")
+        self._update_style_preview()
+
+        ctk.CTkLabel(theme_inner, text=style_section("Restart launcher to fully apply theme changes"),
+            font=get_font(10), text_color=COLORS["text3"]).pack(anchor="w", pady=(15, 0))
+
+        # Buttons row
+        btn_row = ctk.CTkFrame(inner, fg_color="transparent")
+        btn_row.pack(fill="x", pady=20)
+        
+        AnimatedButton(btn_row, text=style_button("SAVE CONFIG"), font=get_font(14, "bold"),
             fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"],
-            height=55, width=200, corner_radius=10, glow_color=COLORS["terminal_green"],
-            command=self.save_all_settings).pack(anchor="w", pady=20)
+            height=55, width=200, corner_radius=style["button_radius"], 
+            glow_color=COLORS["terminal_green"] if style["use_glow"] else None,
+            command=self.save_all_settings).pack(side="left", padx=(0, 15))
+
+        AnimatedButton(btn_row, text=style_button("APPLY THEME"), font=get_font(14, "bold"),
+            fg_color=COLORS["accent_dim"], hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"],
+            height=55, width=200, corner_radius=style["button_radius"], 
+            glow_color=COLORS["terminal_green"] if style["use_glow"] else None,
+            command=self._apply_theme).pack(side="left")
 
         # Info section
-        info_card = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], corner_radius=10,
-                                border_width=1, border_color=COLORS["border"])
+        info_card = ctk.CTkFrame(inner, fg_color=COLORS["bg_medium"], 
+                                corner_radius=style["card_radius"],
+                                border_width=style["border_width"], border_color=COLORS["border"])
         info_card.pack(fill="x")
         info_inner = ctk.CTkFrame(info_card, fg_color="transparent")
         info_inner.pack(fill="x", padx=20, pady=20)
 
-        ctk.CTkLabel(info_inner, text="> ABOUT", font=get_font(14, "bold"), 
+        ctk.CTkLabel(info_inner, text=style_title("ABOUT"), font=get_font(14, "bold"), 
                     text_color=COLORS["accent"]).pack(anchor="w", pady=(0, 10))
         
         about_text = f"""
@@ -2193,10 +2916,135 @@ Features:
   • Multi-profile management
   • Online friend system
   • Auto-update system
+  • Customizable themes & colors
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
         ctk.CTkLabel(info_inner, text=about_text, font=(FONT_FALLBACK, 10), 
                     text_color=COLORS["text2"], justify="left").pack(anchor="w")
+
+    def _update_color_preview(self):
+        """Update color preview boxes"""
+        # Clear existing preview
+        for widget in self.color_preview_frame.winfo_children():
+            widget.destroy()
+        
+        # Get current selected color and theme
+        color_name = self.color_var.get().lower()
+        color_scheme = THEME_COLORS.get(color_name, THEME_COLORS["green"])
+        
+        # Get selected theme for corner radius
+        theme_name = self.theme_var.get()
+        theme_key = "cyber"
+        for key, val in THEMES.items():
+            if val["name"] == theme_name:
+                theme_key = key
+                break
+        theme = THEMES.get(theme_key, THEMES["cyber"])
+        radius = theme.get("corner_radius", 10) // 2
+        
+        # Create preview boxes
+        colors_to_show = [
+            ("primary", color_scheme["primary"]),
+            ("dim", color_scheme["dim"]),
+            ("hover", color_scheme["hover"]),
+            ("glow", color_scheme["glow"]),
+        ]
+        
+        for name, color in colors_to_show:
+            box = ctk.CTkFrame(self.color_preview_frame, fg_color=color, 
+                              width=30, height=30, corner_radius=radius)
+            box.pack(side="left", padx=2)
+            box.pack_propagate(False)
+
+    def _update_style_preview(self):
+        """Update style preview showing theme visual differences"""
+        # Clear existing preview
+        for widget in self.style_preview_frame.winfo_children():
+            widget.destroy()
+        
+        # Get selected theme
+        theme_name = self.theme_var.get()
+        theme_key = "cyber"
+        for key, val in THEMES.items():
+            if val["name"] == theme_name:
+                theme_key = key
+                break
+        theme = THEMES.get(theme_key, THEMES["cyber"])
+        
+        # Get selected color
+        color_name = self.color_var.get().lower()
+        color_scheme = THEME_COLORS.get(color_name, THEME_COLORS["green"])
+        
+        # Create mini preview elements
+        preview_container = ctk.CTkFrame(self.style_preview_frame, fg_color="transparent")
+        preview_container.pack(side="left")
+        
+        # Mini card preview
+        mini_card = ctk.CTkFrame(preview_container, 
+                                fg_color=theme.get("bg_card_base", "#001100"),
+                                corner_radius=theme.get("card_radius", 10)//2,
+                                border_width=theme.get("border_width", 1),
+                                border_color=color_scheme["border"],
+                                width=60, height=35)
+        mini_card.pack(side="left", padx=2)
+        mini_card.pack_propagate(False)
+        
+        # Mini button preview
+        mini_btn = ctk.CTkFrame(preview_container,
+                               fg_color=color_scheme["primary"],
+                               corner_radius=theme.get("button_radius", 10)//2,
+                               width=50, height=20)
+        mini_btn.pack(side="left", padx=2)
+        mini_btn.pack_propagate(False)
+        
+        # Style text info
+        corners = "Sharp" if theme.get("corner_radius", 10) == 0 else f"Round"
+        effects = []
+        if theme.get("use_glow"): effects.append("Glow")
+        if theme.get("use_shadows"): effects.append("Shadow")
+        effects_str = ", ".join(effects) if effects else "None"
+        
+        info_text = f" {corners} | {effects_str}"
+        ctk.CTkLabel(preview_container, text=info_text,
+                    font=get_font(9), text_color=color_scheme["text2"]).pack(side="left", padx=(5, 0))
+
+    def _preview_theme(self, *args):
+        """Preview theme colors and style when selection changes"""
+        self._update_color_preview()
+        self._update_style_preview()
+        
+        # Update theme description
+        theme_name = self.theme_var.get()
+        for key, val in THEMES.items():
+            if val["name"] == theme_name:
+                desc = val.get("desc", "")
+                # Get the selected theme's prefix for preview
+                prefix = val.get("section_prefix", "// ")
+                self.theme_desc_label.configure(text=f"{prefix}{desc}")
+                break
+
+    def _apply_theme(self):
+        """Apply and save theme settings"""
+        global CURRENT_THEME, CURRENT_COLOR, COLORS, STYLE
+        
+        # Get selected theme
+        theme_name = self.theme_var.get()
+        for key, val in THEMES.items():
+            if val["name"] == theme_name:
+                CURRENT_THEME = key
+                break
+        
+        # Get selected color
+        CURRENT_COLOR = self.color_var.get().lower()
+        
+        # Update COLORS and STYLE
+        COLORS.update(get_colors())
+        STYLE.update(get_style())
+        
+        # Save settings
+        save_theme_settings()
+        
+        self.notify("THEME SAVED! Restart launcher for full effect.")
 
     def save_all_settings(self):
         self.settings["java"] = self.java_entry.get()
@@ -2411,7 +3259,8 @@ Features:
     
     def _show_login_register(self):
         """Show login/register screen"""
-        self._type_title(" ./authenticate")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_account", "Account"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "account" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "account" else COLORS["text3"])
@@ -2548,7 +3397,8 @@ Features:
     
     def _show_account_logged_in(self):
         """Show account page when logged in"""
-        self._type_title(" ./account")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_account", "Account"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "account" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "account" else COLORS["text3"])
@@ -2643,7 +3493,8 @@ Features:
     def show_friends(self):
         """Show friends page"""
         self.clear()
-        self._type_title(" ./friends")
+        theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
+        self._type_title(theme.get("page_friends", "Friends"))
         for k, b in self.nav_btns.items():
             b.configure(fg_color=COLORS["accent"] if k == "friends" else "transparent",
                        text_color=COLORS["bg_dark"] if k == "friends" else COLORS["text3"])

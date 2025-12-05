@@ -628,9 +628,9 @@ async def get_stats():
 # ============== Update System ==============
 
 # Current launcher version - UPDATE THIS when you release new versions!
-LAUNCHER_VERSION = "2.6.0"
+LAUNCHER_VERSION = "2.6.6"
 LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
-UPDATE_NOTES = "Fast parallel asset downloads + better Fabric support!"
+UPDATE_NOTES = "New theme system! 5 unique themes (Cyber, Neon, Retro, Minimal, Hacker) with 8 color options. Each theme completely changes the app look!"
 
 @app.get("/update/check")
 async def check_update():

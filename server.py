@@ -104,6 +104,30 @@ def init_db():
             )
         """)
         
+        # Chat messages table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id SERIAL PRIMARY KEY,
+                sender_id INTEGER NOT NULL REFERENCES users(id),
+                receiver_id INTEGER NOT NULL REFERENCES users(id),
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_read INTEGER DEFAULT 0
+            )
+        """)
+        
+        # Voice call sessions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS voice_calls (
+                id SERIAL PRIMARY KEY,
+                caller_id INTEGER NOT NULL REFERENCES users(id),
+                receiver_id INTEGER NOT NULL REFERENCES users(id),
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP
+            )
+        """)
+        
         conn.commit()
         conn.close()
         DB_CONNECTED = True
@@ -143,6 +167,20 @@ class FriendResponse(BaseModel):
     display_name: Optional[str]
     is_online: bool
     status: str
+
+class SendMessage(BaseModel):
+    token: str
+    to_username: str
+    message: str
+
+class GetMessages(BaseModel):
+    token: str
+    with_username: str
+    limit: Optional[int] = 50
+
+class VoiceCallRequest(BaseModel):
+    token: str
+    target_username: str
 
 # ============== Helper Functions ==============
 
@@ -625,12 +663,296 @@ async def get_stats():
         "server_version": "1.0.0"
     }
 
+# ============== Chat System ==============
+
+@app.post("/chat/send")
+async def send_message(req: SendMessage):
+    """Send a message to a friend"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    
+    if len(req.message) > 1000:
+        raise HTTPException(status_code=400, detail="Message too long (max 1000 chars)")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Find target user
+        cursor.execute(
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
+            (req.to_username,)
+        )
+        target = cursor.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Check if they are friends
+        cursor.execute("""
+            SELECT * FROM friends 
+            WHERE ((user_id = %s AND friend_id = %s) OR (user_id = %s AND friend_id = %s))
+            AND status = 'accepted'
+        """, (user["id"], target["id"], target["id"], user["id"]))
+        
+        if not cursor.fetchone():
+            raise HTTPException(status_code=403, detail="You can only message friends")
+        
+        # Insert message
+        cursor.execute(
+            """INSERT INTO messages (sender_id, receiver_id, message)
+               VALUES (%s, %s, %s) RETURNING id, created_at""",
+            (user["id"], target["id"], req.message.strip())
+        )
+        msg = cursor.fetchone()
+        conn.commit()
+    
+    return {
+        "success": True,
+        "message_id": msg["id"],
+        "sent_at": str(msg["created_at"])
+    }
+
+@app.post("/chat/history")
+async def get_chat_history(req: GetMessages):
+    """Get chat history with a friend"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Find target user
+        cursor.execute(
+            "SELECT id, username, display_name FROM users WHERE LOWER(username) = LOWER(%s)",
+            (req.with_username,)
+        )
+        target = cursor.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get messages between the two users
+        cursor.execute("""
+            SELECT m.id, m.sender_id, m.receiver_id, m.message, m.created_at, m.is_read,
+                   u.username as sender_username
+            FROM messages m
+            JOIN users u ON m.sender_id = u.id
+            WHERE (m.sender_id = %s AND m.receiver_id = %s) 
+               OR (m.sender_id = %s AND m.receiver_id = %s)
+            ORDER BY m.created_at DESC
+            LIMIT %s
+        """, (user["id"], target["id"], target["id"], user["id"], req.limit))
+        
+        messages = []
+        for row in cursor.fetchall():
+            messages.append({
+                "id": row["id"],
+                "sender_username": row["sender_username"],
+                "message": row["message"],
+                "sent_at": str(row["created_at"]),
+                "is_mine": row["sender_id"] == user["id"],
+                "is_read": bool(row["is_read"])
+            })
+        
+        # Mark messages as read
+        cursor.execute("""
+            UPDATE messages SET is_read = 1
+            WHERE sender_id = %s AND receiver_id = %s AND is_read = 0
+        """, (target["id"], user["id"]))
+        conn.commit()
+    
+    # Reverse to show oldest first
+    messages.reverse()
+    
+    return {
+        "with_user": {
+            "username": target["username"],
+            "display_name": target["display_name"]
+        },
+        "messages": messages
+    }
+
+@app.post("/chat/unread")
+async def get_unread_count(req: TokenRequest):
+    """Get unread message counts"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Get unread counts per sender
+        cursor.execute("""
+            SELECT u.username, COUNT(*) as count
+            FROM messages m
+            JOIN users u ON m.sender_id = u.id
+            WHERE m.receiver_id = %s AND m.is_read = 0
+            GROUP BY u.username
+        """, (user["id"],))
+        
+        unread = {}
+        total = 0
+        for row in cursor.fetchall():
+            unread[row["username"]] = row["count"]
+            total += row["count"]
+    
+    return {"unread": unread, "total": total}
+
+# ============== Voice Call System ==============
+
+@app.post("/voice/call")
+async def start_voice_call(req: VoiceCallRequest):
+    """Start a voice call with a friend"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Find target user
+        cursor.execute(
+            "SELECT id, username, is_online FROM users WHERE LOWER(username) = LOWER(%s)",
+            (req.target_username,)
+        )
+        target = cursor.fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if not target["is_online"]:
+            raise HTTPException(status_code=400, detail="User is offline")
+        
+        # Check if they are friends
+        cursor.execute("""
+            SELECT * FROM friends 
+            WHERE ((user_id = %s AND friend_id = %s) OR (user_id = %s AND friend_id = %s))
+            AND status = 'accepted'
+        """, (user["id"], target["id"], target["id"], user["id"]))
+        
+        if not cursor.fetchone():
+            raise HTTPException(status_code=403, detail="You can only call friends")
+        
+        # Create call session
+        cursor.execute(
+            """INSERT INTO voice_calls (caller_id, receiver_id, status)
+               VALUES (%s, %s, 'pending') RETURNING id""",
+            (user["id"], target["id"])
+        )
+        call_id = cursor.fetchone()["id"]
+        conn.commit()
+    
+    return {
+        "success": True,
+        "call_id": call_id,
+        "status": "calling",
+        "target": target["username"]
+    }
+
+@app.post("/voice/answer")
+async def answer_voice_call(req: VoiceCallRequest):
+    """Answer an incoming voice call"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Find caller
+        cursor.execute(
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
+            (req.target_username,)
+        )
+        caller = cursor.fetchone()
+        if not caller:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Find and update pending call
+        cursor.execute("""
+            UPDATE voice_calls SET status = 'active'
+            WHERE caller_id = %s AND receiver_id = %s AND status = 'pending'
+            RETURNING id
+        """, (caller["id"], user["id"]))
+        
+        call = cursor.fetchone()
+        if not call:
+            raise HTTPException(status_code=404, detail="No pending call from this user")
+        
+        conn.commit()
+    
+    return {"success": True, "call_id": call["id"], "status": "connected"}
+
+@app.post("/voice/end")
+async def end_voice_call(req: VoiceCallRequest):
+    """End a voice call"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Find other user
+        cursor.execute(
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(%s)",
+            (req.target_username,)
+        )
+        other = cursor.fetchone()
+        if not other:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # End any active call between them
+        cursor.execute("""
+            UPDATE voice_calls SET status = 'ended', ended_at = CURRENT_TIMESTAMP
+            WHERE ((caller_id = %s AND receiver_id = %s) OR (caller_id = %s AND receiver_id = %s))
+            AND status IN ('pending', 'active')
+        """, (user["id"], other["id"], other["id"], user["id"]))
+        
+        conn.commit()
+    
+    return {"success": True, "status": "ended"}
+
+@app.post("/voice/check")
+async def check_incoming_call(req: TokenRequest):
+    """Check for incoming calls"""
+    user = get_user_by_token(req.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Check for pending incoming calls
+        cursor.execute("""
+            SELECT vc.id, vc.status, u.username, u.display_name
+            FROM voice_calls vc
+            JOIN users u ON vc.caller_id = u.id
+            WHERE vc.receiver_id = %s AND vc.status = 'pending'
+            ORDER BY vc.created_at DESC
+            LIMIT 1
+        """, (user["id"],))
+        
+        call = cursor.fetchone()
+        if call:
+            return {
+                "incoming_call": True,
+                "call_id": call["id"],
+                "from_username": call["username"],
+                "from_display_name": call["display_name"]
+            }
+    
+    return {"incoming_call": False}
+
 # ============== Update System ==============
 
 # Current launcher version - UPDATE THIS when you release new versions!
-LAUNCHER_VERSION = "2.6.7"
+LAUNCHER_VERSION = "2.6.8"
 LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
-UPDATE_NOTES = "Simplified themes! 2 themes (Cyber & Minimal) with 8 colors. Apply theme instantly without restart. Default: Minimal + Blue."
+UPDATE_NOTES = "New! Chat & Voice with friends. See online players count. Fixed friends online status."
 
 @app.get("/update/check")
 async def check_update():

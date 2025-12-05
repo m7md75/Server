@@ -594,7 +594,7 @@ async def search_users(query: str, token: str):
         cursor.execute("""
             SELECT id, username, display_name, is_online
             FROM users
-            WHERE username LIKE ? AND id != %s
+            WHERE username LIKE %s AND id != %s
             LIMIT 10
         """, (f"%{query}%", user["id"]))
         
@@ -628,9 +628,9 @@ async def get_stats():
 # ============== Update System ==============
 
 # Current launcher version - UPDATE THIS when you release new versions!
-LAUNCHER_VERSION = "2.6.6"
+LAUNCHER_VERSION = "2.6.7"
 LAUNCHER_DOWNLOAD_URL = "https://raw.githubusercontent.com/m7md75/Server/main/launcher.py"
-UPDATE_NOTES = "New theme system! 5 unique themes (Cyber, Neon, Retro, Minimal, Hacker) with 8 color options. Each theme completely changes the app look!"
+UPDATE_NOTES = "Simplified themes! 2 themes (Cyber & Minimal) with 8 colors. Apply theme instantly without restart. Default: Minimal + Blue."
 
 @app.get("/update/check")
 async def check_update():

@@ -4013,7 +4013,7 @@ Features:
         def load():
             try:
                 resp = requests.post(f"{WEJZ_SERVER}/chat/history", 
-                    json={"token": self.session_token, "with_username": username, "limit": 50},
+                    json={"token": self.online.token, "with_username": username, "limit": 50},
                     timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -4078,7 +4078,7 @@ Features:
         def send():
             try:
                 resp = requests.post(f"{WEJZ_SERVER}/chat/send",
-                    json={"token": self.session_token, "to_username": username, "message": message},
+                    json={"token": self.online.token, "to_username": username, "message": message},
                     timeout=10)
                 if resp.status_code == 200:
                     self.after(0, lambda: self._load_chat_history(username))
@@ -4086,7 +4086,8 @@ Features:
                     data = resp.json()
                     self.after(0, lambda: self.notify(data.get("detail", "Failed to send")))
             except Exception as e:
-                self.after(0, lambda: self.notify(f"Error: {str(e)[:30]}"))
+                err_msg = str(e)[:30]
+                self.after(0, lambda msg=err_msg: self.notify(f"Error: {msg}"))
         
         threading.Thread(target=send, daemon=True).start()
     
@@ -4189,16 +4190,18 @@ Features:
         def start():
             try:
                 resp = requests.post(f"{WEJZ_SERVER}/voice/call",
-                    json={"token": self.session_token, "target_username": username},
+                    json={"token": self.online.token, "target_username": username},
                     timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
                     self.after(0, lambda: self._on_call_started(data, window))
                 else:
                     data = resp.json()
-                    self.after(0, lambda: self._on_call_failed(data.get("detail", "Call failed"), window))
+                    err_detail = data.get("detail", "Call failed")
+                    self.after(0, lambda err=err_detail, w=window: self._on_call_failed(err, w))
             except Exception as e:
-                self.after(0, lambda: self._on_call_failed(str(e), window))
+                err_msg = str(e)
+                self.after(0, lambda err=err_msg, w=window: self._on_call_failed(err, w))
         
         threading.Thread(target=start, daemon=True).start()
     
@@ -4259,7 +4262,7 @@ Features:
         def end():
             try:
                 requests.post(f"{WEJZ_SERVER}/voice/end",
-                    json={"token": self.session_token, "target_username": username},
+                    json={"token": self.online.token, "target_username": username},
                     timeout=5)
             except:
                 pass
@@ -4280,7 +4283,7 @@ Features:
         def check():
             try:
                 resp = requests.post(f"{WEJZ_SERVER}/voice/check",
-                    json={"token": self.session_token},
+                    json={"token": self.online.token},
                     timeout=5)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -4334,7 +4337,7 @@ Features:
         def answer():
             try:
                 resp = requests.post(f"{WEJZ_SERVER}/voice/answer",
-                    json={"token": self.session_token, "target_username": caller},
+                    json={"token": self.online.token, "target_username": caller},
                     timeout=10)
                 if resp.status_code == 200:
                     self.after(0, lambda: self._start_voice_call(caller))
@@ -4350,7 +4353,7 @@ Features:
         def decline():
             try:
                 requests.post(f"{WEJZ_SERVER}/voice/end",
-                    json={"token": self.session_token, "target_username": caller},
+                    json={"token": self.online.token, "target_username": caller},
                     timeout=5)
             except:
                 pass

@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.6.6"
+LAUNCHER_VERSION = "2.6.7"
 # ====================================================================
 
 # Supported Minecraft versions
@@ -196,123 +196,6 @@ THEMES = {
         "section_prefix": "// ",
         "title_cursor": "█",
     },
-    "neon": {
-        "name": "Neon",
-        "desc": "Vibrant nightclub style",
-        # Background colors - deep purple
-        "bg_dark": "#0a0010",
-        "bg_medium": "#120020",
-        "bg_light_base": "#1a0030",
-        "bg_card_base": "#150028",
-        "bg_card_hover_base": "#200038",
-        # Style settings - very rounded
-        "corner_radius": 20,
-        "border_width": 2,
-        "button_radius": 25,
-        "card_radius": 20,
-        # Effects
-        "use_glow": True,
-        "use_shadows": True,
-        # ========== SIDEBAR ==========
-        "logo_icon": "✦",
-        "logo_text": "WEJZ",
-        "nav_home": ("★", "Home"),
-        "nav_profiles": ("★", "Profiles"),
-        "nav_play": ("★", "Play"),
-        "nav_mods": ("★", "Mods"),
-        "nav_friends": ("★", "Friends"),
-        "nav_settings": ("★", "Settings"),
-        "nav_account": ("★", "Account"),
-        "status_label": "STATUS",
-        "status_online": "✦ Online",
-        "status_offline": "✦ Offline",
-        # ========== TOP BAR ==========
-        "topbar_prefix": "✦",
-        "profile_label": "Profile",
-        "user_label": "Player",
-        # ========== PAGES ==========
-        "page_home": "✦ Home",
-        "page_profiles": "✦ Profiles",
-        "page_play": "✦ Play",
-        "page_mods": "✦ Mods",
-        "page_settings": "✦ Settings",
-        "page_friends": "✦ Friends",
-        "page_account": "✦ Account",
-        # ========== HOME PAGE ==========
-        "hero_art": """  ✦═══════════════════════════════✦
-         ★ LET'S PLAY ★
-       Your adventure awaits!
-  ✦═══════════════════════════════✦""",
-        "launch_button": "★ PLAY NOW ★",
-        "launch_hint": "Click to start!",
-        "label_profile": "Profile",
-        "label_mods": "Mods",
-        "label_version": "Version",
-        "label_loader": "Loader",
-        "label_ram": "Memory",
-        "info_format": "◆ {label}: {value}",
-        "section_prefix": "◆ ",
-        "title_cursor": "✦",
-    },
-    "retro": {
-        "name": "Retro",
-        "desc": "Classic 90s arcade style",
-        # Background colors - warm grays
-        "bg_dark": "#1a1a1a",
-        "bg_medium": "#252525",
-        "bg_light_base": "#303030",
-        "bg_card_base": "#2a2a2a",
-        "bg_card_hover_base": "#353535",
-        # Style settings - square
-        "corner_radius": 0,
-        "border_width": 3,
-        "button_radius": 0,
-        "card_radius": 0,
-        # Effects
-        "use_glow": False,
-        "use_shadows": True,
-        # ========== SIDEBAR ==========
-        "logo_icon": "◄►",
-        "logo_text": "ARCADE",
-        "nav_home": ("►", "MENU"),
-        "nav_profiles": ("►", "PLAYER"),
-        "nav_play": ("►", "START"),
-        "nav_mods": ("►", "ITEMS"),
-        "nav_friends": ("►", "SCORES"),
-        "nav_settings": ("►", "OPTIONS"),
-        "nav_account": ("►", "P1"),
-        "status_label": "PLAYER 1",
-        "status_online": "■ READY",
-        "status_offline": "□ INSERT COIN",
-        # ========== TOP BAR ==========
-        "topbar_prefix": "►",
-        "profile_label": "PLAYER",
-        "user_label": "NAME",
-        # ========== PAGES ==========
-        "page_home": "MAIN MENU",
-        "page_profiles": "SELECT PLAYER",
-        "page_play": "START GAME",
-        "page_mods": "POWER UPS",
-        "page_settings": "OPTIONS",
-        "page_friends": "HIGH SCORES",
-        "page_account": "PLAYER ID",
-        # ========== HOME PAGE ==========
-        "hero_art": """╔════════════════════════════════════╗
-║  ████ PRESS START ████              ║
-║  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               ║
-║      INSERT COIN TO PLAY            ║
-╚════════════════════════════════════╝""",
-        "launch_button": "► START GAME",
-        "launch_hint": "PRESS BUTTON",
-        "label_profile": "PLAYER",
-        "label_mods": "ITEMS",
-        "label_version": "LEVEL",
-        "label_loader": "MODE",
-        "label_ram": "POWER",
-        "info_format": "► {label}: {value}",
-        "section_prefix": "► ",
-        "title_cursor": "■",
-    },
     "minimal": {
         "name": "Minimal",
         "desc": "Clean modern design",
@@ -370,71 +253,11 @@ Your game is set up and ready to launch.""",
         "section_prefix": "",
         "title_cursor": "|",
     },
-    "hacker": {
-        "name": "Hacker",
-        "desc": "Terminal CLI interface",
-        # Background colors - pure black
-        "bg_dark": "#000000",
-        "bg_medium": "#000000",
-        "bg_light_base": "#050505",
-        "bg_card_base": "#000000",
-        "bg_card_hover_base": "#0a0a0a",
-        # Style settings - no curves
-        "corner_radius": 0,
-        "border_width": 1,
-        "button_radius": 0,
-        "card_radius": 0,
-        # Effects
-        "use_glow": False,
-        "use_shadows": False,
-        # ========== SIDEBAR ==========
-        "logo_icon": "$",
-        "logo_text": "wejz",
-        "nav_home": ("~", "home"),
-        "nav_profiles": ("/", "users"),
-        "nav_play": ("./", "run"),
-        "nav_mods": ("/", "mods"),
-        "nav_friends": ("@", "net"),
-        "nav_settings": ("/", "etc"),
-        "nav_account": ("$", "auth"),
-        "status_label": "PID:",
-        "status_online": "[OK]",
-        "status_offline": "[--]",
-        # ========== TOP BAR ==========
-        "topbar_prefix": "wejz@localhost:~$",
-        "profile_label": "$USER",
-        "user_label": "$NAME",
-        # ========== PAGES ==========
-        "page_home": "~/$",
-        "page_profiles": "cat /etc/users",
-        "page_play": "./minecraft.sh",
-        "page_mods": "ls mods/",
-        "page_settings": "nano config",
-        "page_friends": "who",
-        "page_account": "whoami",
-        # ========== HOME PAGE ==========
-        "hero_art": """┌──────────────────────────────────────┐
-│ $ ./status                          │
-│ [OK] All systems operational        │
-│ [OK] Minecraft ready                │
-│ $ _                                 │
-└──────────────────────────────────────┘""",
-        "launch_button": "./launch.sh",
-        "launch_hint": "exec minecraft",
-        "label_profile": "$USER",
-        "label_mods": "$MODS",
-        "label_version": "$VER",
-        "label_loader": "$LOADER",
-        "label_ram": "$MEM",
-        "info_format": "echo ${label}  # {value}",
-        "section_prefix": "# ",
-        "title_cursor": "_",
-    },
 }
 
-# Current theme settings (default: cyber + green)
-CURRENT_THEME = "cyber"
-CURRENT_COLOR = "green"
+# Current theme settings (default: minimal + blue)
+CURRENT_THEME = "minimal"
+CURRENT_COLOR = "blue"
 
 def get_colors(theme_name=None, color_name=None):
     """Generate COLORS dict based on theme and color scheme"""
@@ -504,20 +327,12 @@ def style_label(text):
 
 def style_button(text):
     """Format button text according to current theme"""
-    theme = THEMES.get(CURRENT_THEME, THEMES["cyber"])
-    # Get button style from theme
     if CURRENT_THEME == "cyber":
         return f"[ {text} ]"
-    elif CURRENT_THEME == "neon":
-        return f"★ {text} ★"
-    elif CURRENT_THEME == "retro":
-        return f"► {text}"
-    elif CURRENT_THEME == "hacker":
-        return f"./{text.lower()}.sh"
     elif CURRENT_THEME == "minimal":
         return text
     else:
-        return f"[ {text} ]"
+        return text
 
 def get_card_colors():
     """Get card colors based on current theme style"""
@@ -1830,6 +1645,24 @@ class Launcher(ctk.CTk):
         except:
             pass
 
+    def _rebuild_ui(self):
+        """Rebuild entire UI with new theme - no restart needed"""
+        # Save current state
+        current_page = self.current_page
+        
+        # Destroy all widgets in container
+        if hasattr(self, 'container'):
+            self.container.destroy()
+        
+        # Rebuild UI with new theme
+        self.build_ui()
+        
+        # Navigate to current page
+        self.nav(current_page)
+        
+        # Show notification
+        self.notify("Theme applied!")
+
     def on_profile_change(self, name):
         self.current_profile = name
         if self.current_page == "home":
@@ -2875,7 +2708,7 @@ class Launcher(ctk.CTk):
         self.style_preview_frame.pack(side="right")
         self._update_style_preview()
 
-        ctk.CTkLabel(theme_inner, text=style_section("Restart launcher to fully apply theme changes"),
+        ctk.CTkLabel(theme_inner, text=style_section("Click Apply Theme to change the look instantly"),
             font=get_font(10), text_color=COLORS["text3"]).pack(anchor="w", pady=(15, 0))
 
         # Buttons row
@@ -3024,7 +2857,7 @@ Features:
                 break
 
     def _apply_theme(self):
-        """Apply and save theme settings"""
+        """Apply and save theme settings - rebuilds UI immediately"""
         global CURRENT_THEME, CURRENT_COLOR, COLORS, STYLE
         
         # Get selected theme
@@ -3044,7 +2877,8 @@ Features:
         # Save settings
         save_theme_settings()
         
-        self.notify("THEME SAVED! Restart launcher for full effect.")
+        # Rebuild the entire UI with new theme
+        self._rebuild_ui()
 
     def save_all_settings(self):
         self.settings["java"] = self.java_entry.get()

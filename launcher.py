@@ -4,7 +4,7 @@ Minecraft Launcher with Fabric Support, Profiles, and Mods
 """
 
 # ============== VERSION - Update this for new releases ==============
-LAUNCHER_VERSION = "2.6.7"
+LAUNCHER_VERSION = "2.6.8"
 # ====================================================================
 
 # Supported Minecraft versions
@@ -1543,6 +1543,18 @@ class Launcher(ctk.CTk):
         self.account_btn.pack(fill="x")
         self.nav_btns["account"] = self.account_btn
         
+        # Online players counter
+        online_frame = ctk.CTkFrame(sidebar, fg_color=COLORS["bg_light"], corner_radius=8)
+        online_frame.pack(side="bottom", pady=(5, 10), fill="x", padx=10)
+        ctk.CTkLabel(online_frame, text="ONLINE", font=get_font(8), 
+                    text_color=COLORS["text3"]).pack(pady=(5, 0))
+        self.online_count_label = ctk.CTkLabel(online_frame, text="...", 
+                    font=get_font(14, "bold"), text_color=COLORS["success"])
+        self.online_count_label.pack(pady=(0, 5))
+        
+        # Start fetching online count
+        self._fetch_online_count()
+        
         # Status indicator - theme specific
         status_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
         status_frame.pack(side="bottom", pady=(5, 20), fill="x")
@@ -1642,6 +1654,31 @@ class Launcher(ctk.CTk):
                 self.status_indicator.configure(
                     text=theme.get("status_offline", "● OFFLINE"), 
                     text_color=COLORS["error"])
+        except:
+            pass
+
+    def _fetch_online_count(self):
+        """Fetch online players count from server"""
+        def fetch():
+            try:
+                resp = requests.get(f"{ONLINE_SERVER}/stats", timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    online = data.get("online_users", 0)
+                    total = data.get("total_users", 0)
+                    self.after(0, lambda: self._update_online_count(online, total))
+            except:
+                self.after(0, lambda: self._update_online_count(0, 0))
+        
+        threading.Thread(target=fetch, daemon=True).start()
+        # Refresh every 30 seconds
+        self.after(30000, self._fetch_online_count)
+    
+    def _update_online_count(self, online, total):
+        """Update the online counter display"""
+        try:
+            if hasattr(self, 'online_count_label'):
+                self.online_count_label.configure(text=f"{online}")
         except:
             pass
 
@@ -2903,6 +2940,7 @@ Features:
                         self.after(0, self._update_account_ui)
                         self.after(0, lambda: self.notify(f"Welcome back, {username}!"))
                         self._refresh_friends_data()
+                        self.after(2000, self._check_incoming_calls)
                     else:
                         # Session invalid but we have saved data - keep user info for display
                         print("[STARTUP] Session expired, need to re-login")
@@ -3200,6 +3238,7 @@ Features:
                 self.after(0, lambda: self.notify(f"Welcome, {username}!"))
                 self.after(0, lambda: self.nav("home"))
                 self._refresh_friends_data()
+                self.after(1000, self._check_incoming_calls)
             else:
                 self.after(0, lambda: self.notify(result.get("error", "Login failed"), True))
         
@@ -3223,6 +3262,7 @@ Features:
                 self.after(0, self._update_account_ui)
                 self.after(0, lambda: self.notify(f"Account created! Welcome, {username}!"))
                 self.after(0, lambda: self.nav("home"))
+                self.after(1000, self._check_incoming_calls)
             else:
                 self.after(0, lambda: self.notify(result.get("error", "Registration failed"), True))
         
@@ -3494,11 +3534,27 @@ Features:
             btn_frame = ctk.CTkFrame(inner, fg_color="transparent")
             btn_frame.pack(side="right")
             
+            # Chat button
+            AnimatedButton(btn_frame, text="💬", font=get_font(14),
+                fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"],
+                width=40, height=32, corner_radius=6, glow_color=COLORS["accent"],
+                command=lambda u=friend["username"]: self._open_chat(u)).pack(side="left", padx=2)
+            
+            # Voice call button (only if online)
+            call_btn = AnimatedButton(btn_frame, text="📞", font=get_font(14),
+                fg_color=COLORS["success"] if friend["is_online"] else COLORS["bg_light"], 
+                hover_color=COLORS["accent_hover"] if friend["is_online"] else COLORS["bg_light"], 
+                text_color=COLORS["bg_dark"] if friend["is_online"] else COLORS["text3"],
+                width=40, height=32, corner_radius=6, 
+                glow_color=COLORS["success"] if friend["is_online"] else None,
+                command=lambda u=friend["username"], o=friend["is_online"]: self._start_voice_call(u) if o else self.notify("User is offline"))
+            call_btn.pack(side="left", padx=2)
+            
             # Remove button
-            AnimatedButton(btn_frame, text="[REMOVE]", font=get_font(10, "bold"),
+            AnimatedButton(btn_frame, text="✕", font=get_font(12, "bold"),
                 fg_color=COLORS["bg_light"], hover_color=COLORS["error"], text_color=COLORS["text2"],
-                width=80, height=32, corner_radius=6, glow_color=COLORS["error"],
-                command=lambda u=friend["username"]: self._remove_friend(u)).pack()
+                width=35, height=32, corner_radius=6, glow_color=COLORS["error"],
+                command=lambda u=friend["username"]: self._remove_friend(u)).pack(side="left", padx=2)
     
     def _display_pending_requests(self):
         """Display pending friend requests"""
@@ -3889,6 +3945,407 @@ Features:
             self.home_prog_frame.pack_forget()
             self.home_launch_btn.configure(state="normal", text="[ EXECUTE ]")
             self.home_prog_bar.set(0)
+
+    # ============== Chat System ==============
+    
+    def _open_chat(self, username):
+        """Open chat window with a friend"""
+        if not self.is_logged_in:
+            self.notify("Please login first")
+            return
+        
+        # Create chat window
+        chat_window = ctk.CTkToplevel(self)
+        chat_window.title(f"Chat with {username}")
+        chat_window.geometry("500x600")
+        chat_window.configure(fg_color=COLORS["bg_dark"])
+        chat_window.transient(self)
+        chat_window.grab_set()
+        
+        # Store reference
+        self.current_chat_window = chat_window
+        self.current_chat_user = username
+        
+        # Header
+        header = ctk.CTkFrame(chat_window, fg_color=COLORS["bg_medium"], height=60)
+        header.pack(fill="x", padx=10, pady=10)
+        header.pack_propagate(False)
+        
+        ctk.CTkLabel(header, text=f"💬 Chat with {username}", font=get_font(14, "bold"),
+                    text_color=COLORS["accent"]).pack(side="left", padx=15, pady=15)
+        
+        AnimatedButton(header, text="✕", font=get_font(14, "bold"),
+            fg_color=COLORS["bg_light"], hover_color=COLORS["error"], text_color=COLORS["text"],
+            width=40, height=40, corner_radius=8,
+            command=chat_window.destroy).pack(side="right", padx=10)
+        
+        # Messages area
+        self.chat_messages_frame = ctk.CTkScrollableFrame(chat_window, fg_color=COLORS["bg_medium"])
+        self.chat_messages_frame.pack(fill="both", expand=True, padx=10)
+        
+        # Input area
+        input_frame = ctk.CTkFrame(chat_window, fg_color=COLORS["bg_medium"], height=60)
+        input_frame.pack(fill="x", padx=10, pady=10)
+        input_frame.pack_propagate(False)
+        
+        self.chat_input = ctk.CTkEntry(input_frame, font=get_font(12), 
+            fg_color=COLORS["bg_light"], border_color=COLORS["border"],
+            text_color=COLORS["text"], placeholder_text="Type a message...",
+            height=40, corner_radius=8)
+        self.chat_input.pack(side="left", fill="x", expand=True, padx=(10, 5), pady=10)
+        self.chat_input.bind("<Return>", lambda e: self._send_chat_message(username))
+        
+        AnimatedButton(input_frame, text="Send", font=get_font(11, "bold"),
+            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], text_color=COLORS["bg_dark"],
+            width=80, height=40, corner_radius=8, glow_color=COLORS["accent"],
+            command=lambda: self._send_chat_message(username)).pack(side="right", padx=10, pady=10)
+        
+        # Load chat history
+        self._load_chat_history(username)
+        
+        # Start polling for new messages
+        self._poll_chat_messages(username, chat_window)
+    
+    def _load_chat_history(self, username):
+        """Load chat history with a user"""
+        def load():
+            try:
+                resp = requests.post(f"{ONLINE_SERVER}/chat/history", 
+                    json={"token": self.session_token, "with_username": username, "limit": 50},
+                    timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self.after(0, lambda: self._display_chat_messages(data.get("messages", [])))
+            except Exception as e:
+                print(f"Load chat error: {e}")
+        
+        threading.Thread(target=load, daemon=True).start()
+    
+    def _display_chat_messages(self, messages):
+        """Display chat messages"""
+        try:
+            if not hasattr(self, 'chat_messages_frame'):
+                return
+            
+            # Clear existing messages
+            for w in self.chat_messages_frame.winfo_children():
+                w.destroy()
+            
+            if not messages:
+                ctk.CTkLabel(self.chat_messages_frame, text="No messages yet. Say hi! 👋",
+                    font=get_font(12), text_color=COLORS["text3"]).pack(pady=50)
+                return
+            
+            for msg in messages:
+                is_mine = msg.get("is_mine", False)
+                
+                msg_frame = ctk.CTkFrame(self.chat_messages_frame, fg_color="transparent")
+                msg_frame.pack(fill="x", pady=3, padx=5)
+                
+                bubble = ctk.CTkFrame(msg_frame, 
+                    fg_color=COLORS["accent"] if is_mine else COLORS["bg_light"],
+                    corner_radius=12)
+                bubble.pack(side="right" if is_mine else "left", padx=5)
+                
+                ctk.CTkLabel(bubble, text=msg["message"], font=get_font(11),
+                    text_color=COLORS["bg_dark"] if is_mine else COLORS["text"],
+                    wraplength=300, justify="left").pack(padx=12, pady=8)
+                
+                # Time
+                time_label = ctk.CTkLabel(msg_frame, 
+                    text=msg.get("sent_at", "")[-8:-3] if msg.get("sent_at") else "",
+                    font=get_font(8), text_color=COLORS["text3"])
+                time_label.pack(side="right" if is_mine else "left", padx=10)
+            
+            # Scroll to bottom
+            self.chat_messages_frame._parent_canvas.yview_moveto(1.0)
+        except:
+            pass
+    
+    def _send_chat_message(self, username):
+        """Send a chat message"""
+        if not hasattr(self, 'chat_input'):
+            return
+        
+        message = self.chat_input.get().strip()
+        if not message:
+            return
+        
+        self.chat_input.delete(0, "end")
+        
+        def send():
+            try:
+                resp = requests.post(f"{ONLINE_SERVER}/chat/send",
+                    json={"token": self.session_token, "to_username": username, "message": message},
+                    timeout=10)
+                if resp.status_code == 200:
+                    self.after(0, lambda: self._load_chat_history(username))
+                else:
+                    data = resp.json()
+                    self.after(0, lambda: self.notify(data.get("detail", "Failed to send")))
+            except Exception as e:
+                self.after(0, lambda: self.notify(f"Error: {str(e)[:30]}"))
+        
+        threading.Thread(target=send, daemon=True).start()
+    
+    def _poll_chat_messages(self, username, window):
+        """Poll for new messages"""
+        if not window.winfo_exists():
+            return
+        
+        self._load_chat_history(username)
+        
+        # Poll every 3 seconds
+        window.after(3000, lambda: self._poll_chat_messages(username, window))
+    
+    # ============== Voice Call System ==============
+    
+    def _start_voice_call(self, username):
+        """Start a voice call with a friend"""
+        if not self.is_logged_in:
+            self.notify("Please login first")
+            return
+        
+        # Create call window
+        call_window = ctk.CTkToplevel(self)
+        call_window.title(f"Voice Call - {username}")
+        call_window.geometry("350x400")
+        call_window.configure(fg_color=COLORS["bg_dark"])
+        call_window.transient(self)
+        call_window.grab_set()
+        
+        self.current_call_window = call_window
+        self.current_call_user = username
+        self.call_active = False
+        
+        # Header
+        ctk.CTkLabel(call_window, text="📞 Voice Call", font=get_font(18, "bold"),
+                    text_color=COLORS["accent"]).pack(pady=(30, 10))
+        
+        # User avatar
+        avatar = ctk.CTkFrame(call_window, fg_color=COLORS["accent"], width=100, height=100, corner_radius=50)
+        avatar.pack(pady=20)
+        ctk.CTkLabel(avatar, text=username[0].upper(), font=get_font(36, "bold"),
+                    text_color=COLORS["bg_dark"]).place(relx=0.5, rely=0.5, anchor="center")
+        
+        # Username
+        ctk.CTkLabel(call_window, text=username, font=get_font(16, "bold"),
+                    text_color=COLORS["text"]).pack()
+        
+        # Status
+        self.call_status_label = ctk.CTkLabel(call_window, text="Calling...", font=get_font(12),
+                    text_color=COLORS["text3"])
+        self.call_status_label.pack(pady=10)
+        
+        # Call duration
+        self.call_duration_label = ctk.CTkLabel(call_window, text="00:00", font=get_font(24, "bold"),
+                    text_color=COLORS["success"])
+        self.call_duration_label.pack(pady=10)
+        
+        # Buttons
+        btn_frame = ctk.CTkFrame(call_window, fg_color="transparent")
+        btn_frame.pack(pady=30)
+        
+        # Mute button
+        self.mute_btn = AnimatedButton(btn_frame, text="🔇", font=get_font(18),
+            fg_color=COLORS["bg_medium"], hover_color=COLORS["bg_light"], text_color=COLORS["text"],
+            width=60, height=60, corner_radius=30,
+            command=self._toggle_mute)
+        self.mute_btn.pack(side="left", padx=10)
+        
+        # End call button
+        AnimatedButton(btn_frame, text="📵", font=get_font(18),
+            fg_color=COLORS["error"], hover_color="#ff4444", text_color=COLORS["text"],
+            width=60, height=60, corner_radius=30,
+            command=lambda: self._end_voice_call(username, call_window)).pack(side="left", padx=10)
+        
+        # Speaker button
+        self.speaker_btn = AnimatedButton(btn_frame, text="🔊", font=get_font(18),
+            fg_color=COLORS["bg_medium"], hover_color=COLORS["bg_light"], text_color=COLORS["text"],
+            width=60, height=60, corner_radius=30,
+            command=self._toggle_speaker)
+        self.speaker_btn.pack(side="left", padx=10)
+        
+        # Initialize call
+        self.is_muted = False
+        self.speaker_on = True
+        self.call_start_time = None
+        
+        # Start the call
+        self._initiate_voice_call(username, call_window)
+    
+    def _initiate_voice_call(self, username, window):
+        """Initiate voice call on server"""
+        def start():
+            try:
+                resp = requests.post(f"{ONLINE_SERVER}/voice/call",
+                    json={"token": self.session_token, "target_username": username},
+                    timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self.after(0, lambda: self._on_call_started(data, window))
+                else:
+                    data = resp.json()
+                    self.after(0, lambda: self._on_call_failed(data.get("detail", "Call failed"), window))
+            except Exception as e:
+                self.after(0, lambda: self._on_call_failed(str(e), window))
+        
+        threading.Thread(target=start, daemon=True).start()
+    
+    def _on_call_started(self, data, window):
+        """Handle successful call start"""
+        if not window.winfo_exists():
+            return
+        
+        self.call_active = True
+        self.call_start_time = time.time()
+        self.call_status_label.configure(text="Connected", text_color=COLORS["success"])
+        
+        # Start duration timer
+        self._update_call_duration(window)
+        
+        self.notify(f"Call connected with {data.get('target', 'friend')}")
+    
+    def _on_call_failed(self, error, window):
+        """Handle call failure"""
+        if window.winfo_exists():
+            self.call_status_label.configure(text=f"Failed: {error[:30]}", text_color=COLORS["error"])
+            window.after(2000, window.destroy)
+    
+    def _update_call_duration(self, window):
+        """Update call duration display"""
+        if not window.winfo_exists() or not self.call_active:
+            return
+        
+        if self.call_start_time:
+            duration = int(time.time() - self.call_start_time)
+            mins = duration // 60
+            secs = duration % 60
+            self.call_duration_label.configure(text=f"{mins:02d}:{secs:02d}")
+        
+        window.after(1000, lambda: self._update_call_duration(window))
+    
+    def _toggle_mute(self):
+        """Toggle microphone mute"""
+        self.is_muted = not self.is_muted
+        self.mute_btn.configure(
+            fg_color=COLORS["error"] if self.is_muted else COLORS["bg_medium"],
+            text="🔇" if self.is_muted else "🎤"
+        )
+        self.notify("Muted" if self.is_muted else "Unmuted")
+    
+    def _toggle_speaker(self):
+        """Toggle speaker"""
+        self.speaker_on = not self.speaker_on
+        self.speaker_btn.configure(
+            fg_color=COLORS["bg_medium"] if self.speaker_on else COLORS["error"],
+            text="🔊" if self.speaker_on else "🔈"
+        )
+    
+    def _end_voice_call(self, username, window):
+        """End the voice call"""
+        self.call_active = False
+        
+        def end():
+            try:
+                requests.post(f"{ONLINE_SERVER}/voice/end",
+                    json={"token": self.session_token, "target_username": username},
+                    timeout=5)
+            except:
+                pass
+        
+        threading.Thread(target=end, daemon=True).start()
+        
+        if window.winfo_exists():
+            window.destroy()
+        
+        self.notify("Call ended")
+    
+    def _check_incoming_calls(self):
+        """Check for incoming voice calls"""
+        if not self.is_logged_in:
+            self.after(5000, self._check_incoming_calls)
+            return
+        
+        def check():
+            try:
+                resp = requests.post(f"{ONLINE_SERVER}/voice/check",
+                    json={"token": self.session_token},
+                    timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("incoming_call"):
+                        self.after(0, lambda: self._show_incoming_call(data))
+            except:
+                pass
+        
+        threading.Thread(target=check, daemon=True).start()
+        
+        # Check every 5 seconds
+        self.after(5000, self._check_incoming_calls)
+    
+    def _show_incoming_call(self, data):
+        """Show incoming call notification"""
+        caller = data.get("from_username", "Unknown")
+        
+        # Create incoming call dialog
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Incoming Call")
+        dialog.geometry("300x200")
+        dialog.configure(fg_color=COLORS["bg_dark"])
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        ctk.CTkLabel(dialog, text="📞 Incoming Call", font=get_font(16, "bold"),
+                    text_color=COLORS["accent"]).pack(pady=(30, 10))
+        
+        ctk.CTkLabel(dialog, text=caller, font=get_font(18, "bold"),
+                    text_color=COLORS["text"]).pack(pady=10)
+        
+        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_frame.pack(pady=20)
+        
+        # Answer button
+        AnimatedButton(btn_frame, text="✓ Answer", font=get_font(12, "bold"),
+            fg_color=COLORS["success"], hover_color="#44ff44", text_color=COLORS["bg_dark"],
+            width=100, height=40, corner_radius=8,
+            command=lambda: self._answer_call(caller, dialog)).pack(side="left", padx=10)
+        
+        # Decline button
+        AnimatedButton(btn_frame, text="✕ Decline", font=get_font(12, "bold"),
+            fg_color=COLORS["error"], hover_color="#ff4444", text_color=COLORS["text"],
+            width=100, height=40, corner_radius=8,
+            command=lambda: self._decline_call(caller, dialog)).pack(side="left", padx=10)
+    
+    def _answer_call(self, caller, dialog):
+        """Answer an incoming call"""
+        dialog.destroy()
+        
+        def answer():
+            try:
+                resp = requests.post(f"{ONLINE_SERVER}/voice/answer",
+                    json={"token": self.session_token, "target_username": caller},
+                    timeout=10)
+                if resp.status_code == 200:
+                    self.after(0, lambda: self._start_voice_call(caller))
+            except:
+                pass
+        
+        threading.Thread(target=answer, daemon=True).start()
+    
+    def _decline_call(self, caller, dialog):
+        """Decline an incoming call"""
+        dialog.destroy()
+        
+        def decline():
+            try:
+                requests.post(f"{ONLINE_SERVER}/voice/end",
+                    json={"token": self.session_token, "target_username": caller},
+                    timeout=5)
+            except:
+                pass
+        
+        threading.Thread(target=decline, daemon=True).start()
 
     def destroy(self):
         """Clean up on close"""

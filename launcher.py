@@ -1661,7 +1661,7 @@ class Launcher(ctk.CTk):
         """Fetch online players count from server"""
         def fetch():
             try:
-                resp = requests.get(f"{ONLINE_SERVER}/stats", timeout=5)
+                resp = requests.get(f"{WEJZ_SERVER}/stats", timeout=5)
                 if resp.status_code == 200:
                     data = resp.json()
                     online = data.get("online_users", 0)
@@ -3960,7 +3960,9 @@ Features:
         chat_window.geometry("500x600")
         chat_window.configure(fg_color=COLORS["bg_dark"])
         chat_window.transient(self)
-        chat_window.grab_set()
+        
+        # Wait for window to be visible before grab_set
+        chat_window.after(100, lambda: self._safe_grab(chat_window))
         
         # Store reference
         self.current_chat_window = chat_window
@@ -4010,7 +4012,7 @@ Features:
         """Load chat history with a user"""
         def load():
             try:
-                resp = requests.post(f"{ONLINE_SERVER}/chat/history", 
+                resp = requests.post(f"{WEJZ_SERVER}/chat/history", 
                     json={"token": self.session_token, "with_username": username, "limit": 50},
                     timeout=10)
                 if resp.status_code == 200:
@@ -4075,7 +4077,7 @@ Features:
         
         def send():
             try:
-                resp = requests.post(f"{ONLINE_SERVER}/chat/send",
+                resp = requests.post(f"{WEJZ_SERVER}/chat/send",
                     json={"token": self.session_token, "to_username": username, "message": message},
                     timeout=10)
                 if resp.status_code == 200:
@@ -4100,6 +4102,14 @@ Features:
     
     # ============== Voice Call System ==============
     
+    def _safe_grab(self, window):
+        """Safely call grab_set on a window"""
+        try:
+            if window.winfo_exists() and window.winfo_viewable():
+                window.grab_set()
+        except:
+            pass
+    
     def _start_voice_call(self, username):
         """Start a voice call with a friend"""
         if not self.is_logged_in:
@@ -4112,7 +4122,7 @@ Features:
         call_window.geometry("350x400")
         call_window.configure(fg_color=COLORS["bg_dark"])
         call_window.transient(self)
-        call_window.grab_set()
+        call_window.after(100, lambda: self._safe_grab(call_window))
         
         self.current_call_window = call_window
         self.current_call_user = username
@@ -4178,7 +4188,7 @@ Features:
         """Initiate voice call on server"""
         def start():
             try:
-                resp = requests.post(f"{ONLINE_SERVER}/voice/call",
+                resp = requests.post(f"{WEJZ_SERVER}/voice/call",
                     json={"token": self.session_token, "target_username": username},
                     timeout=10)
                 if resp.status_code == 200:
@@ -4248,7 +4258,7 @@ Features:
         
         def end():
             try:
-                requests.post(f"{ONLINE_SERVER}/voice/end",
+                requests.post(f"{WEJZ_SERVER}/voice/end",
                     json={"token": self.session_token, "target_username": username},
                     timeout=5)
             except:
@@ -4269,7 +4279,7 @@ Features:
         
         def check():
             try:
-                resp = requests.post(f"{ONLINE_SERVER}/voice/check",
+                resp = requests.post(f"{WEJZ_SERVER}/voice/check",
                     json={"token": self.session_token},
                     timeout=5)
                 if resp.status_code == 200:
@@ -4294,7 +4304,7 @@ Features:
         dialog.geometry("300x200")
         dialog.configure(fg_color=COLORS["bg_dark"])
         dialog.transient(self)
-        dialog.grab_set()
+        dialog.after(100, lambda: self._safe_grab(dialog))
         
         ctk.CTkLabel(dialog, text="📞 Incoming Call", font=get_font(16, "bold"),
                     text_color=COLORS["accent"]).pack(pady=(30, 10))
@@ -4323,7 +4333,7 @@ Features:
         
         def answer():
             try:
-                resp = requests.post(f"{ONLINE_SERVER}/voice/answer",
+                resp = requests.post(f"{WEJZ_SERVER}/voice/answer",
                     json={"token": self.session_token, "target_username": caller},
                     timeout=10)
                 if resp.status_code == 200:
@@ -4339,7 +4349,7 @@ Features:
         
         def decline():
             try:
-                requests.post(f"{ONLINE_SERVER}/voice/end",
+                requests.post(f"{WEJZ_SERVER}/voice/end",
                     json={"token": self.session_token, "target_username": caller},
                     timeout=5)
             except:
